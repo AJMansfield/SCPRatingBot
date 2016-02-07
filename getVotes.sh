@@ -20,14 +20,22 @@ getVotes(){
 	  --data "pageId=$pid&moduleName=pagerate%2FWhoRatedPageModule&callbackIndex=1&wikidot_token7=1jl18yw4s4i" \
 	  --compressed \
 	  --silent \
-	| python2.7 -c "import json,sys;obj=json.load(sys.stdin);print obj['body'];" \
+	| python2.7 -c "import json,sys;obj=json.load(sys.stdin);print obj['body'];" 2>/dev/null \
 	> $response;
+
+	if test $? -ne 0;
+	then
+		rm $response;
+		echo "$2" >> errors.log;
+		exit 1;
+	fi
 
 	vote=$(mktemp)
 	cat $response \
 	| hxselect -ci -s '\n' 'span[style*="color:#777"]' \
 	| tr -d ' ' \
 	| tr -s '\n' \
+	| sed -e 's/$/1/' \
 	| tail -n +2 \
 	> $vote;
 
@@ -46,7 +54,7 @@ getVotes(){
 	rm $response;
 
 	paste $uid $vote \
-	| sed -e "s#^#$pid\t#" \
+	| sed -e "s/^/$pid\t/" \
 	| awk -F'\t+' 'NF == 3';
 
 	paste $uid $uname \
@@ -67,6 +75,7 @@ getPids(){
 }
 export -f getPids
 
+
 >&2 echo "Getting page list."
 
 pname=$(mktemp)
@@ -76,11 +85,10 @@ getPages \
 
 >&2 echo "Generating page ID table";
 
-
 pids=$(mktemp)
 
 cat $pname \
-| parallel -j16 --bar getPids \
+| parallel -j32 --bar getPids \
 > $pids
 
 paste $pids $pname \
@@ -90,19 +98,31 @@ rm $pids $pname
 
 >&2 echo "Getting votes for each page";
 
+
 echo "" > uids.tsv;
 
+log=$(mktemp)
+
 cat pids.tsv \
-| parallel -j16 --colsep '\t' --bar getVotes \
-| sort -un \
+| parallel -j16 --retries 3 --halt soon,fail=1% --colsep '\t' --bar getVotes \
+| sort -n \
+| awk -F'\t+' 'NF == 3' \
 > votes.tsv
+
+rm $log
 
 temp=$(mktemp)
 
-sort -un pids.tsv -o $temp;
+cat pids.tsv \
+| sort -u \
+| awk -F'\t+' 'NF == 2' \
+> $temp;
 cp $temp pids.tsv;
 
-sort -un uids.tsv -o $temp;
+cat uids.tsv \
+| sort -un \
+| awk -F'\t+' 'NF == 2' \
+> $temp;
 cp $temp uids.tsv;
 
 rm $temp;

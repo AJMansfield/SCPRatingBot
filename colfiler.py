@@ -14,22 +14,36 @@ votes.drop_duplicates([0,1], inplace=True)
 vtab = votes.pivot(1,0,2)
 vtab.fillna(0, inplace=True)
 
+
+
 pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pid','pname'])
 
 uids = pd.read_csv('uids.tsv', '\t', header=None, index_col=1, names=['uid','uname'])
 
 svtab = sps.csr_matrix(vtab)
-u, s, v = sls.svds(svtab)
-s = np.diag(s)
+
+row_sums = np.array(svtab.sum(axis=1))[:,0]
+row_indices, col_indices = svtab.nonzero()
+svtab.data /= row_sums[row_indices]
+
+del row_sums
+del row_indices
+del col_indices
+
+m = svtab.transpose().dot(svtab);
 
 # GetUserName
 
-uname = input('Enter Username:')
-#uname = "AJMansfield"
+while True:
 
-uid = uids.loc[uname,'uid']
+	uname = input('Enter Username:')
+	#uname = "AJMansfield"
 
-uvote = vtab.loc[uid].as_matrix()[:,None]
+	uid = uids.loc[uname,'uid']
 
-print pd.DataFrame(v.transpose().dot(s.dot(v.dot(uvote)))).join(pids).sort(0, ascending=False).head()
+	print "ID:", uid
+
+	uvote = vtab.loc[uid].as_matrix()
+
+	print pd.DataFrame(m.dot(uvote/np.linalg.norm(uvote))).join(pids).sort(0, ascending=False).head()
 
