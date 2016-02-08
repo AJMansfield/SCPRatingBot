@@ -15,7 +15,6 @@ import time
 
 import subprocess
 import threading
-import asyncio
 
 def fullrefresh():
 	subprocess.call('./getVotes.sh')
