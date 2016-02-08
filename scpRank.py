@@ -6,12 +6,10 @@ import scipy.sparse as sps
 import scipy.sparse.linalg as sls
 import numpy as np
 
-from scipy.spatial.distance import cosine
-
-
 import irc.bot
-import irc.strings
-from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
+import irc.stringsn
+
+import time
 
 
 def refresh():
@@ -84,14 +82,19 @@ def recommend(uname):
 
 
 class TestBot(irc.bot.SingleServerIRCBot):
-	def __init__(self, channel, nickname, server, port=6667):
+	def __init__(self, channel, nickname, server, port=6667, password=''):
 		irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nickname, nickname)
 		self.channel = channel
+		self.password = password
 
 	def on_nicknameinuse(self, c, e):
 		c.nick(c.get_nickname() + "_")
 
 	def on_welcome(self, c, e):
+		print "authenticating..."
+		c.privmsg("NickServ", "IDENTIFY " + self.password)
+		time.sleep(0.5);
+		print "joining..."
 		c.join(self.channel)
 
 	def on_privmsg(self, c, e):
@@ -118,8 +121,8 @@ def main():
 	import sys
 	refresh()
 
-	if len(sys.argv) != 4:
-		print("Usage: testbot <server[:port]> <channel> <nickname>")
+	if len(sys.argv) != 5:
+		print("Usage: scpRank.py <server[:port]> <channel> <nickname> <password>")
 		sys.exit(1)
 
 	s = sys.argv[1].split(":", 1)
@@ -134,8 +137,9 @@ def main():
 		port = 6667
 	channel = sys.argv[2]
 	nickname = sys.argv[3]
+	password = sys.argv[4]
 
-	bot = TestBot(channel, nickname, server, port)
+	bot = TestBot(channel, nickname, server, port, password)
 	bot.start()
 
 if __name__ == "__main__":
