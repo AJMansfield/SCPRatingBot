@@ -1,4 +1,4 @@
-
+#!/usr/bin/python
 
 import pandas as pd
 import scipy as sp
@@ -8,12 +8,11 @@ import numpy as np
 
 from scipy.spatial.distance import cosine
 
-votes = pd.read_csv('votes.tsv', '\t', header=None)
-votes.drop_duplicates([0,1], inplace=True)
+votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'])
+votes.drop_duplicates(['pid','uid'], inplace=True)
 
-vtab = votes.pivot(1,0,2)
+vtab = votes.pivot('uid','pid','vote')
 vtab.fillna(0, inplace=True)
-
 
 
 pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pid','pname'])
@@ -22,7 +21,7 @@ uids = pd.read_csv('uids.tsv', '\t', header=None, index_col=1, names=['uid','una
 
 svtab = sps.csr_matrix(vtab)
 
-row_sums = np.array(svtab.sum(axis=1))[:,0]
+row_sums = np.linalg.norm(vtab.as_matrix(), axis=1)
 row_indices, col_indices = svtab.nonzero()
 svtab.data /= row_sums[row_indices]
 
@@ -35,15 +34,33 @@ m = svtab.transpose().dot(svtab);
 # GetUserName
 
 while True:
+	try:
 
-	uname = input('Enter Username:')
-	#uname = "AJMansfield"
+		uname = input('Enter Username:')
+		#uname = "AJMansfield"
+		uid = uids.loc[uname,'uid']
 
-	uid = uids.loc[uname,'uid']
+	except KeyError, SyntaxError:
 
-	print "ID:", uid
+		if uname != "love" and uname != "hate" and uname != "random":
+			print "Invalid username."
+			continue;
 
-	uvote = vtab.loc[uid].as_matrix()
+	if uname == "love":
+		uid = uids.ix[0,'uid']
+		uvote = np.ones(vtab.loc[uid].as_matrix().shape)
 
-	print pd.DataFrame(m.dot(uvote/np.linalg.norm(uvote))).join(pids).sort(0, ascending=False).head()
+	elif uname == "hate":
+		uid = uids.ix[0,'uid']
+		uvote = -np.ones(vtab.loc[uid].as_matrix().shape)
+
+	elif uname == "random":
+		uid = uids.ix[0,'uid']
+		uvote = np.random.random(vtab.loc[uid].as_matrix().shape)
+
+	else:
+		print "ID:", uid
+		uvote = vtab.loc[uid].as_matrix()
+
+	print pd.DataFrame(m.dot(uvote), names=['score']).join(pids).sort(0, ascending=False).head()
 
