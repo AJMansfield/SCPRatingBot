@@ -170,10 +170,10 @@ cat $pname \
 | awk -F'\t+' 'NF == 2' \
 > pids.tsv
 
+rm $pname;
+
+read -rsp $'Press any key to continue...\n' -n1 key
+
 cat pids.tsv \
 | parallel -j32 --retries 3 --colsep '\t' --bar getVotes \
-| sort -n \
-| awk -F'\t+' 'NF == 3' \
-> votes.tsv;
-
-rm $pname;
+> votes.tsv
