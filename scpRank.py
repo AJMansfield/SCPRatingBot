@@ -7,66 +7,76 @@ import scipy.sparse.linalg as sls
 import numpy as np
 
 import irc.bot
-import irc.stringsn
+import irc.strings
 
 import time
 
 
+
+import subprocess
+import threading
+import asyncio
+
+def fullrefresh():
+	subprocess.call('./getVotes.sh')
+	refresh()
+	threading.Timer(6*60*60, fullrefresh).start()
+
+refreshLock = threading.Lock();
 def refresh():
 	global votes, vtab, pids, uids, m;
 
-	votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'])
-	votes.drop_duplicates(['pid','uid'], inplace=True)
+	votes2 = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'])
+	votes2.drop_duplicates(['pid','uid'], inplace=True)
 
-	vtab = votes.pivot('uid','pid','vote')
-	vtab.fillna(0, inplace=True)
+	vtab2 = votes2.pivot('uid','pid','vote')
+	vtab2.fillna(0, inplace=True)
 
 
-	pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'])
+	pids2 = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'])
 
-	uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'])
-	uids.drop_duplicates(inplace=True)
-	uids.set_index('uname', inplace=True)
+	uids2 = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'])
+	uids2.drop_duplicates(inplace=True)
+	uids2.set_index('uname', inplace=True)
 
-	svtab = sps.csr_matrix(vtab)
+	svtab = sps.csr_matrix(vtab2)
 
-	row_sums = np.linalg.norm(vtab.as_matrix(), axis=1)
-	row_indices, _ = svtab.nonzero()
-	svtab.data /= row_sums[row_indices]
+	svtab /= np.linalg.norm(vtab2.as_matrix(), axis=0, keepdims=True)
 
-	del row_sums
-	del row_indices
-
-	m = svtab.transpose().dot(svtab);
+	m2 = svtab2.transpose().dot(svtab2)
+	
+	with refreshLock:
+		votes, vtab, pids, uids, m = votes2, vtab2, pids2, uids2, m2
 
 # GetUserName
 
 def recommend(uname):
 
-	try:
-		uid = uids.loc[uname,'uid']
+	with refreshLock:
+		try:
+			uid = uids.loc[uname,'uid']
 
-	except KeyError, SyntaxError:
+		except KeyError, SyntaxError:
 
-		if uname != "love" and uname != "hate" and uname != "random":
-			return "Username not recognised."
+			if uname != "love" and uname != "hate" and uname != "random":
+				return "Username not recognised."
 
-	if uname == "love":
-		uid = uids.ix[0,'uid']
-		uvote = np.ones(vtab.loc[uid].as_matrix().shape)
+		if uname == "love":
+			uid = uids.ix[0,'uid']
+			uvote = np.ones(vtab.loc[uid].as_matrix().shape)
 
-	elif uname == "hate":
-		uid = uids.ix[0,'uid']
-		uvote = -np.ones(vtab.loc[uid].as_matrix().shape)
+		elif uname == "hate":
+			uid = uids.ix[0,'uid']
+			uvote = -np.ones(vtab.loc[uid].as_matrix().shape)
 
-	elif uname == "random":
-		uid = uids.ix[0,'uid']
-		uvote = np.random.random(vtab.loc[uid].as_matrix().shape)
+		elif uname == "random":
+			uid = uids.ix[0,'uid']
+			uvote = np.random.random(vtab.loc[uid].as_matrix().shape)
 
-	else:
-		uvote = vtab.loc[uid].as_matrix()
+		else:
+			uvote = vtab.loc[uid].as_matrix()
 
-	data = np.concatenate((uvote[:,np.newaxis],m.dot(uvote)[:,np.newaxis]), axis=1)
+		data = np.concatenate((uvote[:,np.newaxis],m.dot(uvote)[:,np.newaxis]), axis=1)
 
 	data = pd.DataFrame(data, columns=['vote', 'score']).join(pids)
 
@@ -114,12 +124,17 @@ class TestBot(irc.bot.SingleServerIRCBot):
 		c = self.connection
 
 		if cmd[:4] == ".rec":
-			c.privmsg(self.channel, nick + ": " + recommend( cmd[4:].strip()))
+			rec = nick + ": " + recommend( cmd[4:].strip())
+			c.privmsg(self.channel, rec)
+			print "query:", cmd
+			print "recommendation: ", rec
 
 
 def main():
 	import sys
+
 	refresh()
+	threading.Timer(60*60, fullrefresh).start()
 
 	if len(sys.argv) != 5:
 		print("Usage: scpRank.py <server[:port]> <channel> <nickname> <password>")
@@ -135,12 +150,14 @@ def main():
 			sys.exit(1)
 	else:
 		port = 6667
+
 	channel = sys.argv[2]
 	nickname = sys.argv[3]
 	password = sys.argv[4]
 
 	bot = TestBot(channel, nickname, server, port, password)
+
 	bot.start()
 
-if __name__ == "__main__":
-	main()
+#if __name__ == "__main__":
+#	main()

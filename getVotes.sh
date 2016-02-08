@@ -106,7 +106,7 @@ getVotes(){
 
 	paste $uid $uname \
 	| awk -F'\t+' 'NF == 2' \
-	>> uids.tsv;
+	>> uids2.tsv;
 
 	#clean up temporary files
 	rm $response $vote $uid $uname;
@@ -152,7 +152,7 @@ fi;
 
 
 #use wikidot api to get a list of pages
->&2 echo "Getting page list."
+>&2 echo "Fetching page list"
 pname=$(mktemp);
 #randomize order so requests are more uniformly distributed later
 getPages \
@@ -165,15 +165,22 @@ getPages \
 
 echo "" > uids.tsv; #clear user ID list
 
+pids=$(mktemp);
 cat $pname \
 | parallel -j32 --retries 3 --bar getPid \
 | awk -F'\t+' 'NF == 2' \
-> pids.tsv
+> $pids;
 
 rm $pname;
 
-read -rsp $'Press any key to continue...\n' -n1 key
-
-cat pids.tsv \
+>&2 echo "Generating vote database";
+votes=$(mktemp);
+cat $pids \
 | parallel -j32 --retries 3 --colsep '\t' --bar getVotes \
-> votes.tsv
+> $votes
+
+
+#only update main files once everything is done
+mv uids2.tsv uids.tsv
+mv $pids pids.tsv
+mv $votes votes.tsv
