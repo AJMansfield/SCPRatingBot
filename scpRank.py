@@ -10,48 +10,55 @@ import irc.bot
 import irc.strings
 
 import time
-
-
+import datetime
+import sys
 
 import subprocess
 import threading
 
+np.seterr(all='raise', divide='raise', over='raise', under='raise', invalid='raise')
+
 def fullrefresh():
+	print datetime.datetime.now(), " Refreshing cache"
 	subprocess.call('./getVotes.sh')
 	refresh()
-	threading.Timer(6*60*60, fullrefresh).start()
+	print "Scheduling next refresh"
+	t = threading.Timer(1*60*60, fullrefresh)
+	t.setDaemon(True)
+	t.start()
+	print datetime.datetime.now(), " Refreshed."
 
-refreshLock = threading.Lock();
+
 def refresh():
+	print datetime.datetime.now(), " Refreshing stored tables"
 	global votes, vtab, pids, uids, m;
 
-	votes2 = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'])
-	votes2.drop_duplicates(['pid','uid'], inplace=True)
+	votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'uid':np.int32, 'vote':np.int8})
+	votes.drop_duplicates(['pid','uid'], inplace=True)
+	votes.set_index(['uid', 'pid'], inplace=True)
 
-	vtab2 = votes2.pivot('uid','pid','vote')
-	vtab2.fillna(0, inplace=True)
+	vtab = votes.unstack().fillna(0).astype(np.int16)
 
+	svtab = sps.csr_matrix(vtab)
 
-	pids2 = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'])
+	print datetime.datetime.now(), " Computing transform"
 
-	uids2 = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'])
-	uids2.drop_duplicates(inplace=True)
-	uids2.set_index('uname', inplace=True)
+	m = svtab.transpose().dot(svtab)
 
-	svtab = sps.csr_matrix(vtab2)
+	del svtab
 
-	svtab /= np.linalg.norm(vtab2.as_matrix(), axis=0, keepdims=True)
+	print datetime.datetime.now(), " Updating tables"
 
-	m2 = svtab2.transpose().dot(svtab2)
-	
-	with refreshLock:
-		votes, vtab, pids, uids, m = votes2, vtab2, pids2, uids2, m2
+	pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'], dtype={'pid':np.int32, 'pname':'string'})
 
-# GetUserName
+	uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
+	uids.drop_duplicates(inplace=True)
+	uids.set_index('uname', inplace=True)
+
 
 def recommend(uname):
-
-	with refreshLock:
+	uname = uname.lower()
+	try:
 		try:
 			uid = uids.loc[uname,'uid']
 
@@ -75,17 +82,22 @@ def recommend(uname):
 		else:
 			uvote = vtab.loc[uid].as_matrix()
 
-		data = np.concatenate((uvote[:,np.newaxis],m.dot(uvote)[:,np.newaxis]), axis=1)
+		data = np.concatenate((uvote[:,np.newaxis], (m.dot(uvote) / m.diagonal().astype(np.float16))[:,np.newaxis] ), axis=1)
 
-	data = pd.DataFrame(data, columns=['vote', 'score']).join(pids)
+		data = pd.DataFrame(data, columns=['vote', 'score']).join(pids)
 
-	data = data[data['vote'].isin([0])].sort_values(by='score', ascending=False)
+		data = data[data['vote'].isin([0])].sort_values(by='score', ascending=False)
 
-	data = data[data['score'] > 0]
+		data = data[data['score'] > 0]
 
-	#print data.head(10)
+		#print data.head(10)
 
-	return "http://scp-wiki.net/" + data.head(10).sample(weights='score')['pname'].iloc[0]
+		return "http://scp-wiki.net/" + data.head(20).sample(weights='score')['pname'].iloc[0]
+	except Exception as e:
+		print datetime.datetime.now(), " ", uname
+		print datetime.datetime.now(), " ", e.__doc__
+		print datetime.datetime.now(), " ", e.message
+		return "An unknown error occured."
 
 
 
@@ -100,17 +112,32 @@ class TestBot(irc.bot.SingleServerIRCBot):
 		c.nick(c.get_nickname() + "_")
 
 	def on_welcome(self, c, e):
-		print "authenticating..."
+		print datetime.datetime.now(), " Authenticating"
 		c.privmsg("NickServ", "IDENTIFY " + self.password)
 		time.sleep(0.5);
-		print "joining..."
+		print datetime.datetime.now(), " Joining channel"
 		c.join(self.channel)
+		print datetime.datetime.now(), " Connected."
 
 	def on_privmsg(self, c, e):
-		self.do_command(e, e.arguments[0])
+		nick = e.source.nick
+		c = self.connection
+
+		if e.arguments[0][:4] == ".rec":
+			print datetime.datetime.now(), " query:", e.arguments[0]
+			rec = nick + ": " + recommend( e.arguments[0][4:].strip())
+			c.privmsg(nick, rec)
+			print datetime.datetime.now(), " recommendation: ", rec
 
 	def on_pubmsg(self, c, e):
-		self.do_command(e, e.arguments[0])
+		nick = e.source.nick
+		c = self.connection
+
+		if e.arguments[0][:4] == ".rec":
+			print datetime.datetime.now(), " query:", e.arguments[0]
+			rec = nick + ": " + recommend( e.arguments[0][4:].strip())
+			c.privmsg(self.channel, rec)
+			print datetime.datetime.now(), " recommendation: ", rec
 
 	def on_dccmsg(self, c, e):
 		pass
@@ -118,22 +145,13 @@ class TestBot(irc.bot.SingleServerIRCBot):
 	def on_dccchat(self, c, e):
 		pass
 
-	def do_command(self, e, cmd):
-		nick = e.source.nick
-		c = self.connection
-
-		if cmd[:4] == ".rec":
-			rec = nick + ": " + recommend( cmd[4:].strip())
-			c.privmsg(self.channel, rec)
-			print "query:", cmd
-			print "recommendation: ", rec
-
 
 def main():
-	import sys
 
 	refresh()
-	threading.Timer(60*60, fullrefresh).start()
+	t = threading.Timer(60*60, fullrefresh)
+	t.setDaemon(True)
+	t.start()
 
 	if len(sys.argv) != 5:
 		print("Usage: scpRank.py <server[:port]> <channel> <nickname> <password>")
@@ -158,5 +176,5 @@ def main():
 
 	bot.start()
 
-#if __name__ == "__main__":
-#	main()
+if __name__ == "__main__":
+	main()

@@ -54,6 +54,7 @@ getVotes(){
 	cat $response \
 	| hxselect -ci -s '\n' 'a' 2>/dev/null \
 	| grep -oP '(?<=alt=")[^"]*' \
+	| tr "[:upper:]" "[:lower:]" \
 	> $uname;
 
 	#requet user vote data
@@ -97,6 +98,7 @@ getVotes(){
 	cat $response \
 	| hxselect -ci -s '\n' 'a' \
 	| grep -oP '(?<=alt=")[^"]*' \
+	| tr "[:upper:]" "[:lower:]" \
 	>> $uname;
 
 	#zip data together into output format
@@ -145,14 +147,14 @@ curl 'http://www.scp-wiki.net/robots.txt' \
 
 if [ ! $? ];
 then
-	>&2 echo 'Uh-oh, robots.txt has a rule in it that applies to this bot! We might still be allowed, but please check first!';
+	echo 'Uh-oh, robots.txt has a rule in it that applies to this bot! We might still be allowed, but please check first!';
 	exit 1;
 fi;
 
 
 
 #use wikidot api to get a list of pages
->&2 echo "Fetching page list"
+echo "Fetching page list"
 pname=$(mktemp);
 #randomize order so requests are more uniformly distributed later
 getPages \
@@ -161,13 +163,13 @@ getPages \
 
 
 #get numeric page IDs, needed to request additional page data
->&2 echo "Generating page ID table";
+echo "Generating page ID table";
 
 echo "" > uids.tsv; #clear user ID list
 
 pids=$(mktemp);
 cat $pname \
-| parallel -j32 --retries 3 --bar getPid \
+| parallel -j4 --retries 3 --bar getPid \
 | awk -F'\t+' 'NF == 2' \
 > $pids;
 
@@ -176,7 +178,7 @@ rm $pname;
 >&2 echo "Generating vote database";
 votes=$(mktemp);
 cat $pids \
-| parallel -j32 --retries 3 --colsep '\t' --bar getVotes \
+| parallel -j4 --retries 3 --colsep '\t' --bar getVotes \
 > $votes
 
 
