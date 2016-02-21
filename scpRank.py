@@ -16,47 +16,69 @@ import sys
 import subprocess
 import threading
 
-np.seterr(all='raise', divide='raise', over='raise', under='raise', invalid='raise')
+np.seterr(all='warn')
 
 def fullrefresh():
-	print datetime.datetime.now(), " Refreshing cache"
-	subprocess.call('./getVotes.sh')
-	refresh()
-	print "Scheduling next refresh"
-	t = threading.Timer(1*60*60, fullrefresh)
-	t.setDaemon(True)
-	t.start()
-	print datetime.datetime.now(), " Refreshed."
+	try:
+		print datetime.datetime.now(), " Refreshing cache"
+		subprocess.call('./getVotes.sh')
+		refresh()
+		print datetime.datetime.now(), " Scheduling next refresh"
+		t = threading.Timer(6*60*60, fullrefresh)
+		t.setDaemon(True)
+		t.start()
+		print datetime.datetime.now(), " Refreshed."
 
+	except Exception:
+		print datetime.datetime.now(), " An error occured while refreshing the cache."
 
+		try:
+			t.cancel()
+		except Exception:
+			pass
+
+		print datetime.datetime.now(), " Scheduling next refresh"
+		t = threading.Timer(6*60*60, fullrefresh)
+		t.setDaemon(True)
+		t.start()
+
+		raise;
+	
 def refresh():
-	print datetime.datetime.now(), " Refreshing stored tables"
-	global votes, vtab, pids, uids, m;
+	try:
+		print datetime.datetime.now(), " Refreshing stored tables"
+		global votes, vtab, pids, uids, m;
 
-	votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'uid':np.int32, 'vote':np.int8})
-	votes.drop_duplicates(['pid','uid'], inplace=True)
-	votes.set_index(['uid', 'pid'], inplace=True)
+		votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'uid':np.int32, 'vote':np.int8})
+		votes.drop_duplicates(['pid','uid'], inplace=True)
+		votes.set_index(['uid', 'pid'], inplace=True)
 
-	vtab = votes.unstack().fillna(0).astype(np.int16)
+		vtab = votes.unstack().fillna(0).astype(np.float16)
 
-	svtab = sps.csr_matrix(vtab)
+		svtab = sps.csr_matrix(vtab)
 
-	print datetime.datetime.now(), " Computing transform"
+		print datetime.datetime.now(), " Computing transform"
 
-	m = svtab.transpose().dot(svtab)
+		svtab = svtab / np.linalg.norm(vtab.as_matrix(), axis=0, keepdims=True)
 
-	del svtab
+		m = svtab.transpose().dot(svtab)
+		
+		del svtab
 
-	print datetime.datetime.now(), " Updating tables"
+		print datetime.datetime.now(), " Updating tables"
 
-	pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'], dtype={'pid':np.int32, 'pname':'string'})
+		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'], dtype={'pid':np.int32, 'pname':'string'})
 
-	uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
-	uids.drop_duplicates(inplace=True)
-	uids.set_index('uname', inplace=True)
+		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
+		uids.drop_duplicates(inplace=True)
+		uids.set_index('uname', inplace=True)
+	except Exception:
+		print datetime.datetime.now(), "An error occured while reloading the tables."
+		raise
 
 
 def recommend(uname):
+
 	uname = uname.lower()
 	try:
 		try:
@@ -64,25 +86,11 @@ def recommend(uname):
 
 		except KeyError, SyntaxError:
 
-			if uname != "love" and uname != "hate" and uname != "random":
-				return "Username not recognised."
+			return "Username not recognised."
 
-		if uname == "love":
-			uid = uids.ix[0,'uid']
-			uvote = np.ones(vtab.loc[uid].as_matrix().shape)
+		uvote = vtab.loc[uid].as_matrix()
 
-		elif uname == "hate":
-			uid = uids.ix[0,'uid']
-			uvote = -np.ones(vtab.loc[uid].as_matrix().shape)
-
-		elif uname == "random":
-			uid = uids.ix[0,'uid']
-			uvote = np.random.random(vtab.loc[uid].as_matrix().shape)
-
-		else:
-			uvote = vtab.loc[uid].as_matrix()
-
-		data = np.concatenate((uvote[:,np.newaxis], (m.dot(uvote) / m.diagonal().astype(np.float16))[:,np.newaxis] ), axis=1)
+		data = np.concatenate((uvote[:,np.newaxis], m.dot(uvote).T), axis=1)
 
 		data = pd.DataFrame(data, columns=['vote', 'score']).join(pids)
 
@@ -92,7 +100,7 @@ def recommend(uname):
 
 		#print data.head(10)
 
-		return "http://scp-wiki.net/" + data.head(20).sample(weights='score')['pname'].iloc[0]
+		return ("http://scp-wiki.net/" + data.head(20).sample(n=3, weights='score')['pname']).str.cat(sep=", ")
 	except Exception as e:
 		print datetime.datetime.now(), " ", uname
 		print datetime.datetime.now(), " ", e.__doc__
@@ -155,7 +163,7 @@ def main():
 
 	if len(sys.argv) != 5:
 		print("Usage: scpRank.py <server[:port]> <channel> <nickname> <password>")
-		sys.exit(1)
+		raise ValueError
 
 	s = sys.argv[1].split(":", 1)
 	server = s[0]
@@ -164,7 +172,7 @@ def main():
 			port = int(s[1])
 		except ValueError:
 			print("Error: Erroneous port.")
-			sys.exit(1)
+			raise
 	else:
 		port = 6667
 
