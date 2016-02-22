@@ -1,3 +1,5 @@
 identity.ini
 getAuth.sh
+test.sh
 *.tsv
+*.log
