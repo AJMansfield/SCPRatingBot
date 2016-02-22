@@ -256,9 +256,13 @@ def main():
 	try:
 		scpRank.start()
 	except KeyboardInterrupt:
+
+		scpRank.disconnect("scpRank should be back soon!")
+
 		wait = random.randint(0, 30)
 		print "Waiting ", wait, " seconds before disconnecting lurker."
 		time.sleep(wait)
+
 		sys.exit(0)
 
 if __name__ == "__main__":
