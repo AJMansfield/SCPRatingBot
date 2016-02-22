@@ -113,9 +113,9 @@ def command(cmd):
 
 	if cmd[:5] == ".rec ":
 		return recommend(cmd[5:].strip())
-	else if cmd[:5] == ".top ":
+	elif cmd[:4] == ".top":
 		return "This feature has not yet been implemented."
-	else if cmd[:5] == ".new ":
+	elif cmd[:4] == ".new":
 		return "This feature has not yet been implemented."
 	else:
 		return ""
@@ -146,7 +146,7 @@ class ScpRankBot(irc.bot.SingleServerIRCBot):
 		c = self.connection
 
 		result = command(e.arguments[0])
-		if result != ""
+		if result != "":
 			c.privmsg(nick, nick + ": " + result);
 			print datetime.datetime.now(), " Sent PM: ", nick, ": ", result
 
@@ -155,7 +155,7 @@ class ScpRankBot(irc.bot.SingleServerIRCBot):
 		c = self.connection
 
 		result = command(e.arguments[0])
-		if result != ""
+		if result != "":
 			c.privmsg(self.channel, nick + ": " + result);
 			print datetime.datetime.now(), " Sent Chat: ", self.channel, ": ", nick, ": ", result
 
@@ -166,7 +166,7 @@ class ScpRankBot(irc.bot.SingleServerIRCBot):
 		pass
 
 class ScpRankLurker(irc.bot.SingleServerIRCBot):
-	def __init__(self, channel, nickname, server, port=6667, password='', outbot):
+	def __init__(self, channel, nickname, server, port=6667, password='', outbot=None):
 		irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nickname, nickname)
 		self.channel = channel
 		self.password = password
@@ -189,11 +189,11 @@ class ScpRankLurker(irc.bot.SingleServerIRCBot):
 
 	def on_pubmsg(self, c, e):
 		nick = e.source.nick
-		c = outbot.connection
+		c = self.outbot.connection
 
 		result = command(e.arguments[0])
-		if result != ""
-			c.notice(nick, nick + ": " + result);
+		if result != "":
+			c.privmsg(nick, nick + ": " + result);
 			print datetime.datetime.now(), " Lurker: Sent notice: ", nick, ": ", result
 
 	def on_dccmsg(self, c, e):
@@ -205,14 +205,9 @@ class ScpRankLurker(irc.bot.SingleServerIRCBot):
 
 def main():
 
-	refresh()
-	ut = threading.Timer(60*60, fullrefresh)
-	ut.setDaemon(True)
-	ut.start()
-
-	if len(sys.argv) != 8:
-		print("Usage: scpRank.py <server[:port]> <channel1> <nickname1> <password1> <channel2> <nickname2> <password2>")
-		raise ValueError
+	if len(sys.argv) != 8 and len(sys.argv) != 5:
+		print("Usage: scpRank.py <server[:port]> <channel1> <nickname1> <password1> [<channel2> <nickname2> <password2>]")
+		sys.exit(1)
 
 	s = sys.argv[1].split(":", 1)
 	server = s[0]
@@ -221,25 +216,32 @@ def main():
 			port = int(s[1])
 		except ValueError:
 			print("Error: Erroneous port.")
-			raise
+			sys.exit(1)
 	else:
 		port = 6667
 
 	channel1 = sys.argv[2]
 	nickname1 = sys.argv[3]
 	password1 = sys.argv[4]
-	channel2 = sys.argv[5]
-	nickname2 = sys.argv[6]
-	password2 = sys.argv[7]
+	if len(sys.argv) == 8:
+		channel2 = sys.argv[5]
+		nickname2 = sys.argv[6]
+		password2 = sys.argv[7]
+
+	# refresh()
+	# ut = threading.Timer(60*60, fullrefresh)
+	# ut.setDaemon(True)
+	# ut.start()
 
 	scpRank = ScpRankBot(channel1, nickname1, server, port, password1)
-	lurker = ScpRankLurker(channel2, nickname2, server, port, password2)
+	if len(sys.argv) == 8:
+		lurker = ScpRankLurker(channel2, nickname2, server, port, password2, scpRank)
 
-	st = threading.Thread(target=scpRank.start)
-	st.setDaemon(True)
-	st.start()
+		lt = threading.Thread(target=lurker.start)
+		lt.setDaemon(True)
+		lt.start()
 
-	lurker.start()
+	scpRank.start()
 
 if __name__ == "__main__":
 	main()
