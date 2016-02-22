@@ -12,6 +12,7 @@ import irc.strings
 import time
 import datetime
 import sys
+import random
 
 import subprocess
 import threading
@@ -107,10 +108,25 @@ def recommend(uname):
 		print datetime.datetime.now(), " ", e.message
 		return "An unknown error occured."
 
+def command(cmd):
+	if cmd[:1] == ".":
+		print datetime.datetime.now(), " query:", cmd
+
+	if cmd[:5] == ".rec ":
+		return recommend(cmd[5:].strip())
+	elif cmd[:4] == ".top":
+		return "This feature has not yet been implemented."
+	elif cmd[:4] == ".new":
+		return "This feature has not yet been implemented."
+	elif cmd[:4] == ".src":
+		return "https://github.com/AJMansfield/SCPRatingBot"
+	else:
+		return ""
 
 
 
-class TestBot(irc.bot.SingleServerIRCBot):
+
+class ScpRankBot(irc.bot.SingleServerIRCBot):
 	def __init__(self, channel, nickname, server, port=6667, password=''):
 		irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nickname, nickname)
 		self.channel = channel
@@ -120,9 +136,10 @@ class TestBot(irc.bot.SingleServerIRCBot):
 		c.nick(c.get_nickname() + "_")
 
 	def on_welcome(self, c, e):
-		print datetime.datetime.now(), " Authenticating"
-		c.privmsg("NickServ", "IDENTIFY " + self.password)
-		time.sleep(0.5);
+		if self.password != "none":
+			print datetime.datetime.now(), " Authenticating"
+			c.privmsg("NickServ", "IDENTIFY " + self.password)
+			time.sleep(0.5);
 		print datetime.datetime.now(), " Joining channel"
 		c.join(self.channel)
 		print datetime.datetime.now(), " Connected."
@@ -131,21 +148,56 @@ class TestBot(irc.bot.SingleServerIRCBot):
 		nick = e.source.nick
 		c = self.connection
 
-		if e.arguments[0][:4] == ".rec":
-			print datetime.datetime.now(), " query:", e.arguments[0]
-			rec = nick + ": " + recommend( e.arguments[0][4:].strip())
-			c.privmsg(nick, rec)
-			print datetime.datetime.now(), " recommendation: ", rec
+		result = command(e.arguments[0])
+		if result != "":
+			c.privmsg(nick, nick + ": " + result);
+			print datetime.datetime.now(), " Sent PM: ", nick, ": ", result
 
 	def on_pubmsg(self, c, e):
 		nick = e.source.nick
 		c = self.connection
 
-		if e.arguments[0][:4] == ".rec":
-			print datetime.datetime.now(), " query:", e.arguments[0]
-			rec = nick + ": " + recommend( e.arguments[0][4:].strip())
-			c.privmsg(self.channel, rec)
-			print datetime.datetime.now(), " recommendation: ", rec
+		result = command(e.arguments[0])
+		if result != "":
+			c.privmsg(self.channel, nick + ": " + result);
+			print datetime.datetime.now(), " Sent Chat: ", self.channel, ": ", nick, ": ", result
+
+	def on_dccmsg(self, c, e):
+		pass
+
+	def on_dccchat(self, c, e):
+		pass
+
+class ScpRankLurker(irc.bot.SingleServerIRCBot):
+	def __init__(self, channel, nickname, server, port=6667, password='', outbot=None):
+		irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nickname, nickname)
+		self.channel = channel
+		self.password = password
+		self.outbot = outbot
+
+	def on_nicknameinuse(self, c, e):
+		c.nick(c.get_nickname() + "_")
+
+	def on_welcome(self, c, e):
+		if self.password != "none":
+			print datetime.datetime.now(), " Lurker: Authenticating"
+			c.privmsg("NickServ", "IDENTIFY " + self.password)
+			time.sleep(0.5);
+		print datetime.datetime.now(), " Lurker: Joining channel"
+		c.join(self.channel)
+		print datetime.datetime.now(), " Lurker: Connected."
+
+	def on_privmsg(self, c, e):
+		pass
+
+	def on_pubmsg(self, c, e):
+		nick = e.source.nick
+		c = self.outbot.connection
+		if e.arguments[0][:8] == "scpRank:":
+			result = command(e.arguments[0][8:])
+			if result != "":
+				c.privmsg(nick, nick + ": " + result);
+				print datetime.datetime.now(), " Lurker: Sent notice: ", nick, ": ", result
 
 	def on_dccmsg(self, c, e):
 		pass
@@ -156,33 +208,64 @@ class TestBot(irc.bot.SingleServerIRCBot):
 
 def main():
 
-	refresh()
-	t = threading.Timer(60*60, fullrefresh)
-	t.setDaemon(True)
-	t.start()
-
-	if len(sys.argv) != 5:
-		print("Usage: scpRank.py <server[:port]> <channel> <nickname> <password>")
-		raise ValueError
+	if len(sys.argv) != 9 and len(sys.argv) != 5:
+		print("Usage: scpRank.py <server[:port]> <channel1> <nickname1> <password1> [<server2[:port2]> <channel2> <nickname2> <password2>]")
+		sys.exit(1)
 
 	s = sys.argv[1].split(":", 1)
-	server = s[0]
+	server1 = s[0]
 	if len(s) == 2:
 		try:
-			port = int(s[1])
+			port1 = int(s[1])
 		except ValueError:
 			print("Error: Erroneous port.")
-			raise
+			sys.exit(1)
 	else:
-		port = 6667
+		port1 = 6667
 
-	channel = sys.argv[2]
-	nickname = sys.argv[3]
-	password = sys.argv[4]
+	channel1 = sys.argv[2]
+	nickname1 = sys.argv[3]
+	password1 = sys.argv[4]
 
-	bot = TestBot(channel, nickname, server, port, password)
+	scpRank = ScpRankBot(channel1, nickname1, server1, port1, password1)
 
-	bot.start()
+	if len(sys.argv) == 9:
+		s = sys.argv[5].split(":", 1)
+		server2 = s[0]
+		if len(s) == 2:
+			try:
+				port2 = int(s[1])
+			except ValueError:
+				print("Error: Erroneous port.")
+				sys.exit(1)
+		else:
+			port2 = 6667
+
+		channel2 = sys.argv[6]
+		nickname2 = sys.argv[7]
+		password2 = sys.argv[8]
+
+		lurker = ScpRankLurker(channel2, nickname2, server2, port2, password2, scpRank)
+		lt = threading.Thread(target=lurker.start)
+		lt.setDaemon(True)
+		lt.start() #use computation time from computing transform to space their joins.
+
+	refresh()
+	ut = threading.Timer(60*60, fullrefresh)
+	ut.setDaemon(True)
+	ut.start()
+
+	try:
+		scpRank.start()
+	except KeyboardInterrupt:
+
+		scpRank.disconnect("scpRank should be back soon!")
+
+		wait = random.randint(0, 30)
+		print "Waiting ", wait, " seconds before disconnecting lurker."
+		time.sleep(wait)
+
+		sys.exit(0)
 
 if __name__ == "__main__":
 	main()
