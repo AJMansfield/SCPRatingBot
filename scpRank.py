@@ -118,6 +118,8 @@ def command(cmd):
 		return "This feature has not yet been implemented."
 	elif cmd[:4] == ".new":
 		return "This feature has not yet been implemented."
+	elif cmd[:4] == ".src":
+		return "https://github.com/AJMansfield/SCPRatingBot"
 	else:
 		return ""
 
