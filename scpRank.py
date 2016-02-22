@@ -12,6 +12,7 @@ import irc.strings
 import time
 import datetime
 import sys
+import random
 
 import subprocess
 import threading
@@ -190,7 +191,7 @@ class ScpRankLurker(irc.bot.SingleServerIRCBot):
 	def on_pubmsg(self, c, e):
 		nick = e.source.nick
 		c = self.outbot.connection
-		if(e.arguments[0][:8] == "scpRank:")
+		if e.arguments[0][:8] == "scpRank:":
 			result = command(e.arguments[0][8:])
 			if result != "":
 				c.privmsg(nick, nick + ": " + result);
@@ -205,43 +206,60 @@ class ScpRankLurker(irc.bot.SingleServerIRCBot):
 
 def main():
 
-	if len(sys.argv) != 8 and len(sys.argv) != 5:
-		print("Usage: scpRank.py <server[:port]> <channel1> <nickname1> <password1> [<channel2> <nickname2> <password2>]")
+	if len(sys.argv) != 9 and len(sys.argv) != 5:
+		print("Usage: scpRank.py <server[:port]> <channel1> <nickname1> <password1> [<server2[:port2]> <channel2> <nickname2> <password2>]")
 		sys.exit(1)
 
 	s = sys.argv[1].split(":", 1)
-	server = s[0]
+	server1 = s[0]
 	if len(s) == 2:
 		try:
-			port = int(s[1])
+			port1 = int(s[1])
 		except ValueError:
 			print("Error: Erroneous port.")
 			sys.exit(1)
 	else:
-		port = 6667
+		port1 = 6667
 
 	channel1 = sys.argv[2]
 	nickname1 = sys.argv[3]
 	password1 = sys.argv[4]
-	if len(sys.argv) == 8:
-		channel2 = sys.argv[5]
-		nickname2 = sys.argv[6]
-		password2 = sys.argv[7]
+
+	scpRank = ScpRankBot(channel1, nickname1, server1, port1, password1)
+
+	if len(sys.argv) == 9:
+		s = sys.argv[5].split(":", 1)
+		server2 = s[0]
+		if len(s) == 2:
+			try:
+				port2 = int(s[1])
+			except ValueError:
+				print("Error: Erroneous port.")
+				sys.exit(1)
+		else:
+			port2 = 6667
+
+		channel2 = sys.argv[6]
+		nickname2 = sys.argv[7]
+		password2 = sys.argv[8]
+
+		lurker = ScpRankLurker(channel2, nickname2, server2, port2, password2, scpRank)
+		lt = threading.Thread(target=lurker.start)
+		lt.setDaemon(True)
+		lt.start() #use computation time from computing transform to space their joins.
 
 	refresh()
 	ut = threading.Timer(60*60, fullrefresh)
 	ut.setDaemon(True)
 	ut.start()
 
-	scpRank = ScpRankBot(channel1, nickname1, server, port, password1)
-	if len(sys.argv) == 8:
-		lurker = ScpRankLurker(channel2, nickname2, server, port, password2, scpRank)
-
-		lt = threading.Thread(target=lurker.start)
-		lt.setDaemon(True)
-		lt.start()
-
-	scpRank.start()
+	try:
+		scpRank.start()
+	except KeyboardInterrupt:
+		wait = random.randint(0, 30)
+		print "Waiting ", wait, " seconds before disconnecting lurker."
+		time.sleep(wait)
+		sys.exit(0)
 
 if __name__ == "__main__":
 	main()
