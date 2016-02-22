@@ -126,7 +126,7 @@ getPages(){
 
 #retrieves the pid number for a given page name
 getPid(){
-	echo -ne $1 '\t';
+	echo -ne $1'\t';
 	curl --silent "http://www.scp-wiki.net/$1" \
 	| grep -oP '(?<=pageId = )[0-9]*' ;
 	exit $?;
