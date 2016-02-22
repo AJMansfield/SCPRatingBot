@@ -181,7 +181,11 @@ cat pids.tsv \
 | parallel -j4 --retries 3 --colsep '\t' --bar getVotes \
 > $votes;
 
-
+if [ ! $? ];
+then
+	echo "Something went wrong; not updating tables.";
+	rm $votes uids2.tsv;
+fi
 #only update main files once everything is done
-mv uids2.tsv uids.tsv
+mv uids2.tsv uids.tsv;
 mv $votes votes.tsv;
