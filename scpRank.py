@@ -190,11 +190,11 @@ class ScpRankLurker(irc.bot.SingleServerIRCBot):
 	def on_pubmsg(self, c, e):
 		nick = e.source.nick
 		c = self.outbot.connection
-
-		result = command(e.arguments[0])
-		if result != "":
-			c.privmsg(nick, nick + ": " + result);
-			print datetime.datetime.now(), " Lurker: Sent notice: ", nick, ": ", result
+		if(e.arguments[0][:8] == "scpRank:")
+			result = command(e.arguments[0][8:])
+			if result != "":
+				c.privmsg(nick, nick + ": " + result);
+				print datetime.datetime.now(), " Lurker: Sent notice: ", nick, ": ", result
 
 	def on_dccmsg(self, c, e):
 		pass
@@ -228,10 +228,10 @@ def main():
 		nickname2 = sys.argv[6]
 		password2 = sys.argv[7]
 
-	# refresh()
-	# ut = threading.Timer(60*60, fullrefresh)
-	# ut.setDaemon(True)
-	# ut.start()
+	refresh()
+	ut = threading.Timer(60*60, fullrefresh)
+	ut.setDaemon(True)
+	ut.start()
 
 	scpRank = ScpRankBot(channel1, nickname1, server, port, password1)
 	if len(sys.argv) == 8:
