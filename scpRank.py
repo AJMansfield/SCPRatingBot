@@ -6,6 +6,8 @@ import scipy.sparse as sps
 import scipy.sparse.linalg as sls
 import numpy as np
 
+from math import sqrt
+
 import irc.bot
 import irc.strings
 
@@ -18,6 +20,19 @@ import subprocess
 import threading
 
 np.seterr(all='warn')
+
+def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95%
+    n = ups + downs
+
+    if n == 0:
+        return 0
+
+    z = 1.0 
+    phat = float(ups) / n
+    if lb:
+    	return ((phat + z*z/(2*n) - z * sqrt((phat*(1-phat)+z*z/(4*n))/n))/(1+z*z/n))
+    else:
+    	return ((phat + z*z/(2*n) + z * sqrt((phat*(1-phat)+z*z/(4*n))/n))/(1+z*z/n))
 
 def fullrefresh():
 	try:
@@ -54,11 +69,24 @@ def refresh():
 		votes.drop_duplicates(['pid','uid'], inplace=True)
 		votes.set_index(['uid', 'pid'], inplace=True)
 
-		vtab = votes.unstack().fillna(0).astype(np.float16)
+		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'], dtype={'pid':np.int32, 'pname':'string'})
+		pids.set_index('pid', inplace=True)
+
+		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
+		uids.drop_duplicates(inplace=True)
+		uids.set_index('uname', inplace=True)
+
+		print datetime.datetime.now(), " Counting votes"
+
+		vtab = votes.unstack()
+		vcounts = vtab.apply(pd.Series.value_counts).fillna(0).transpose().reset_index().set_index('pid')
+		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b,1.96,True))
+		
+		print datetime.datetime.now(), " Computing transform"
+
+		vtab = vtab.fillna(0).astype(np.float16)
 
 		svtab = sps.csr_matrix(vtab)
-
-		print datetime.datetime.now(), " Computing transform"
 
 		svtab = svtab / np.linalg.norm(vtab.as_matrix(), axis=0, keepdims=True)
 
@@ -66,16 +94,13 @@ def refresh():
 		
 		del svtab
 
-		print datetime.datetime.now(), " Updating tables"
+		print datetime.datetime.now(), " Done."
 
-		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'], dtype={'pid':np.int32, 'pname':'string'})
-
-		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
-		uids.drop_duplicates(inplace=True)
-		uids.set_index('uname', inplace=True)
 	except Exception:
 		print datetime.datetime.now(), "An error occured while reloading the tables."
 		raise
+
+refresh()
 
 
 def recommend(uname):
@@ -108,14 +133,29 @@ def recommend(uname):
 		print datetime.datetime.now(), " ", e.message
 		return "An unknown error occured."
 
+
+
+
+def best(args):
+	if args == "":
+		i = 0
+	else:
+		i = int(args)
+
+	return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
+		("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
+
+
+
+
 def command(cmd):
 	if cmd[:1] == ".":
 		print datetime.datetime.now(), " query:", cmd
 
 	if cmd[:5] == ".rec ":
 		return recommend(cmd[5:].strip())
-	elif cmd[:4] == ".top":
-		return "This feature has not yet been implemented."
+	elif cmd[:6].strip() == ".best":
+		return best(cmd[6:].strip())
 	elif cmd[:4] == ".new":
 		return "This feature has not yet been implemented."
 	elif cmd[:4] == ".src":
@@ -257,13 +297,15 @@ def main():
 
 	try:
 		scpRank.start()
-	except KeyboardInterrupt:
+	except:
 
 		scpRank.disconnect("scpRank should be back soon!")
 
 		wait = random.randint(0, 30)
-		print "Waiting ", wait, " seconds before disconnecting lurker."
+		print datetime.datetime.now(), " Waiting ", wait, " seconds before disconnecting lurker."
 		time.sleep(wait)
+
+		lurker.disconnect("disconnect message")
 
 		sys.exit(0)
 
