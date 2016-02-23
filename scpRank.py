@@ -19,6 +19,7 @@ import random
 import subprocess
 import threading
 
+
 np.seterr(all='warn')
 
 def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95%
@@ -70,7 +71,7 @@ def refresh():
 		votes.set_index(['uid', 'pid'], inplace=True)
 
 		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'], dtype={'pid':np.int32, 'pname':'string'})
-		pidscore = pids.set_index('pid')
+		pids.set_index('pid', inplace=True)
 
 		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
 		uids.drop_duplicates(inplace=True)
@@ -78,9 +79,9 @@ def refresh():
 
 		print datetime.datetime.now(), " Counting votes"
 
-		vtab = votes.unstack()
+		vtab = votes.unstack()['vote']
 		vcounts = vtab.apply(pd.Series.value_counts).fillna(0).transpose().reset_index().set_index('pid')
-		pidscore['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b,1.96,True))
+		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b,1.96,True))
 		
 		print datetime.datetime.now(), " Computing transform"
 
@@ -115,17 +116,12 @@ def recommend(uname):
 
 			return "Username not recognised."
 
-		uvote = vtab.loc[uid].as_matrix()
+		uvote = vtab.loc[uid:uid].transpose()
+		uvote['score'] = m.dot(uvote)
 
-		data = np.concatenate((uvote[:,np.newaxis], m.dot(uvote).T), axis=1)
-
-		data = pd.DataFrame(data, columns=['vote', 'score']).join(pids)
-
-		data = data[data['vote'].isin([0])].sort_values(by='score', ascending=False)
-
+		data = pd.concat([pids,uvote], axis=1)
+		data = data[data[uid] == 0].sort_values(by='score', ascending=False)
 		data = data[data['score'] > 0]
-
-		#print data.head(10)
 
 		return ("http://scp-wiki.net/" + data.head(20).sample(n=3, weights='score')['pname']).str.cat(sep=", ")
 	except Exception as e:
@@ -144,7 +140,7 @@ def best(args):
 		i = int(args)
 
 	return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
-		("http://scp-wiki.net/" + pidscore.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
+		("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
 
 
 
@@ -313,5 +309,5 @@ def main():
 
 		sys.exit(0)
 
-if __name__ == "__main__":
-	main()
+#if __name__ == "__main__":
+#	main()
