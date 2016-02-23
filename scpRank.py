@@ -63,14 +63,14 @@ def fullrefresh():
 def refresh():
 	try:
 		print datetime.datetime.now(), " Refreshing stored tables"
-		global votes, vtab, pids, uids, m;
+		global votes, vtab, pids, pidscore, uids, m;
 
 		votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'uid':np.int32, 'vote':np.int8})
 		votes.drop_duplicates(['pid','uid'], inplace=True)
 		votes.set_index(['uid', 'pid'], inplace=True)
 
 		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'], dtype={'pid':np.int32, 'pname':'string'})
-		pids.set_index('pid', inplace=True)
+		pidscore = pids.set_index('pid')
 
 		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
 		uids.drop_duplicates(inplace=True)
@@ -80,7 +80,7 @@ def refresh():
 
 		vtab = votes.unstack()
 		vcounts = vtab.apply(pd.Series.value_counts).fillna(0).transpose().reset_index().set_index('pid')
-		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b,1.96,True))
+		pidscore['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b,1.96,True))
 		
 		print datetime.datetime.now(), " Computing transform"
 
@@ -144,7 +144,7 @@ def best(args):
 		i = int(args)
 
 	return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
-		("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
+		("http://scp-wiki.net/" + pidscore.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
 
 
 
