@@ -119,7 +119,7 @@ def recommend(uname):
 		uvote = vtab.loc[uid:uid].transpose()
 		uvote['score'] = m.dot(uvote)
 
-		data = pd.concat([pids,uvote], axis=1)
+		data = pd.merge(pids, uvote, left_index=True, right_index=True)
 		data = data[data[uid] == 0].sort_values(by='score', ascending=False)
 		data = data[data['score'] > 0]
 
@@ -308,6 +308,6 @@ def main():
 		lurker.disconnect("disconnect message")
 
 		sys.exit(0)
-
+		
 if __name__ == "__main__":
 	main()
