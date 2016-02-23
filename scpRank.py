@@ -100,7 +100,8 @@ def refresh():
 		print datetime.datetime.now(), "An error occured while reloading the tables."
 		raise
 
-refresh()
+
+
 
 
 def recommend(uname):
