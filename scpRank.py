@@ -236,9 +236,12 @@ class ScpRankLurker(irc.bot.SingleServerIRCBot):
 		c = self.outbot.connection
 		if e.arguments[0][:8] == "scpRank:":
 			result = command(e.arguments[0][8:].strip())
-			if result != "":
-				c.privmsg(nick, nick + ": " + result);
-				print datetime.datetime.now(), " Lurker: Sent notice: ", nick, ": ", result
+		else:
+			result = command(e.arguments[0])
+			
+		if result != "":
+			c.privmsg(nick, nick + ": " + result);
+			print datetime.datetime.now(), " Lurker: Sent notice: ", nick, ": ", result
 
 	def on_dccmsg(self, c, e):
 		pass
