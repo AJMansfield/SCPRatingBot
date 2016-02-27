@@ -28,7 +28,6 @@ def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95
     if n == 0:
         return 0
 
-    z = 1.0 
     phat = float(ups) / n
     if lb:
     	return ((phat + z*z/(2*n) - z * sqrt((phat*(1-phat)+z*z/(4*n))/n))/(1+z*z/n))
