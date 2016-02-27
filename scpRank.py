@@ -308,5 +308,5 @@ def main():
 
 		sys.exit(0)
 		
-if __name__ == "__main__" & !sys.flags.interactive:
+if (__name__ == "__main__")  and not(sys.flags.interactive):
 	main()
