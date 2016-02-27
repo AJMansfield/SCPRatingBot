@@ -125,7 +125,7 @@ def recommend(uname):
 		data = data[data['score'] > 0]
 
 		return ("http://scp-wiki.net/" + data.head(20).sample(n=3, weights='score')['pname']).str.cat(sep=", ")
-		
+
 	except Exception as e:
 		print datetime.datetime.now(), " ", uname
 		print datetime.datetime.now(), " ", e.__doc__
@@ -146,7 +146,7 @@ def best(args):
 			("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
 
 	except Exception as e:
-		print datetime.datetime.now(), " ", uname
+		print datetime.datetime.now(), " ", args
 		print datetime.datetime.now(), " ", e.__doc__
 		print datetime.datetime.now(), " ", e.message
 		return "An unknown error occured."
@@ -161,10 +161,7 @@ def rank(args):
 		return ("Ranking: #" + str(entry.index.tolist()[0]) + ", Score: " + str(entry.best.iloc[0]))
 
 	except Exception as e:
-		print datetime.datetime.now(), " ", uname
-		print datetime.datetime.now(), " ", e.__doc__
-		print datetime.datetime.now(), " ", e.message
-		return "An unknown error occured."
+		return ''
 
 
 
@@ -188,7 +185,7 @@ def command(cmd):
 			return ""
 
 	except Exception as e:
-		print datetime.datetime.now(), " ", uname
+		print datetime.datetime.now(), " ", cmd
 		print datetime.datetime.now(), " ", e.__doc__
 		print datetime.datetime.now(), " ", e.message
 		return "An unknown error occured."
