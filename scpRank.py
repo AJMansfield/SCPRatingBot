@@ -125,6 +125,7 @@ def recommend(uname):
 		data = data[data['score'] > 0]
 
 		return ("http://scp-wiki.net/" + data.head(20).sample(n=3, weights='score')['pname']).str.cat(sep=", ")
+		
 	except Exception as e:
 		print datetime.datetime.now(), " ", uname
 		print datetime.datetime.now(), " ", e.__doc__
@@ -143,6 +144,7 @@ def best(args):
 
 		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
 			("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
+
 	except Exception as e:
 		print datetime.datetime.now(), " ", uname
 		print datetime.datetime.now(), " ", e.__doc__
@@ -157,7 +159,7 @@ def rank(args):
 		entry = pidscore[pidscore.pname == slugify(args)]
 
 		return ("Ranking: #" + str(entry.index.tolist()[0]) + ", Score: " + str(entry.best.iloc[0]))
-		
+
 	except Exception as e:
 		print datetime.datetime.now(), " ", uname
 		print datetime.datetime.now(), " ", e.__doc__
@@ -169,20 +171,27 @@ def rank(args):
 
 
 def command(cmd):
-	if cmd[:1] == ".":
-		print datetime.datetime.now(), " query:", cmd
-	if cmd[:5] == ".rec ":
-		return recommend(cmd[5:].strip())
-	elif cmd[:6].strip() == ".best":
-		return best(cmd[6:].strip())
-	elif cmd[:6].strip() == ".rank":
-		return rank(cmd[6:].strip())
-	elif cmd[:4] == ".new":
-		return "This feature has not yet been implemented."
-	elif cmd[:4] == ".src":
-		return "https://github.com/AJMansfield/SCPRatingBot"
-	else:
-		return ""
+	try:
+		if cmd[:1] == ".":
+			print datetime.datetime.now(), " query:", cmd
+		if cmd[:5] == ".rec ":
+			return recommend(cmd[5:].strip())
+		elif cmd[:6].strip() == ".best":
+			return best(cmd[6:].strip())
+		elif cmd[:6].strip() == ".rank":
+			return rank(cmd[6:].strip())
+		elif cmd[:4] == ".new":
+			return "This feature has not yet been implemented."
+		elif cmd[:4] == ".src":
+			return "https://github.com/AJMansfield/SCPRatingBot"
+		else:
+			return ""
+
+	except Exception as e:
+		print datetime.datetime.now(), " ", uname
+		print datetime.datetime.now(), " ", e.__doc__
+		print datetime.datetime.now(), " ", e.message
+		return "An unknown error occured."
 
 
 
