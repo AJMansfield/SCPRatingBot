@@ -6,6 +6,8 @@ import scipy.sparse as sps
 import scipy.sparse.linalg as sls
 import numpy as np
 
+from slugify import slugify
+
 from math import sqrt
 
 import irc.bot
@@ -142,16 +144,25 @@ def best(args):
 		("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
 
 
+def rank(args):
+
+	pidscore = pids.sort_values('best',ascending=False).reset_index()
+	entry = pidscore[pidscore.pname == slugify(args)]
+
+	return ("Ranking: #" + str(entry.index.tolist()[0]) + ", Score: " + str(entry.best.iloc[0]))
+
+
 
 
 def command(cmd):
 	if cmd[:1] == ".":
 		print datetime.datetime.now(), " query:", cmd
-
 	if cmd[:5] == ".rec ":
 		return recommend(cmd[5:].strip())
 	elif cmd[:6].strip() == ".best":
 		return best(cmd[6:].strip())
+	elif cmd[:6].strip() == ".rank":
+		return rank(cmd[6:].strip())
 	elif cmd[:4] == ".new":
 		return "This feature has not yet been implemented."
 	elif cmd[:4] == ".src":
