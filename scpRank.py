@@ -135,21 +135,35 @@ def recommend(uname):
 
 
 def best(args):
-	if args == "":
-		i = 0
-	else:
-		i = int(args)
+	try:
+		if args == "":
+			i = 0
+		else:
+			i = int(args)
 
-	return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
-		("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
+		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
+			("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
+	except Exception as e:
+		print datetime.datetime.now(), " ", uname
+		print datetime.datetime.now(), " ", e.__doc__
+		print datetime.datetime.now(), " ", e.message
+		return "An unknown error occured."
 
 
 def rank(args):
+	try:
 
-	pidscore = pids.sort_values('best',ascending=False).reset_index()
-	entry = pidscore[pidscore.pname == slugify(args)]
+		pidscore = pids.sort_values('best',ascending=False).reset_index()
+		entry = pidscore[pidscore.pname == slugify(args)]
 
-	return ("Ranking: #" + str(entry.index.tolist()[0]) + ", Score: " + str(entry.best.iloc[0]))
+		return ("Ranking: #" + str(entry.index.tolist()[0]) + ", Score: " + str(entry.best.iloc[0]))
+		
+	except Exception as e:
+		print datetime.datetime.now(), " ", uname
+		print datetime.datetime.now(), " ", e.__doc__
+		print datetime.datetime.now(), " ", e.message
+		return "An unknown error occured."
+
 
 
 
