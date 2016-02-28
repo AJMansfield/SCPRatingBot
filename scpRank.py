@@ -21,6 +21,8 @@ import random
 import subprocess
 import threading
 
+import ConfigParser
+
 
 np.seterr(all='warn')
 
@@ -193,9 +195,9 @@ def command(cmd):
 
 
 
-class ScpRankBot(irc.bot.SingleServerIRCBot):
+class ScpRank(irc.bot.SingleServerIRCBot):
 	def __init__(self, channel, nickname, server, port=6667, password=''):
-		irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nickname, nickname)
+		irc.bot.SingleServerIRCBot.__init__(self, [(server, int(port))], nickname, nickname)
 		self.channel = channel
 		self.password = password
 
@@ -235,9 +237,9 @@ class ScpRankBot(irc.bot.SingleServerIRCBot):
 	def on_dccchat(self, c, e):
 		pass
 
-class ScpRankLurker(irc.bot.SingleServerIRCBot):
-	def __init__(self, channel, nickname, server, port=6667, password='', outbot=None):
-		irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nickname, nickname)
+class Sybil(irc.bot.SingleServerIRCBot):
+	def __init__(self, channel='', nickname='', server='', port=6667, password='', outbot=None):
+		irc.bot.SingleServerIRCBot.__init__(self, [(server, int(port))], nickname, nickname)
 		self.channel = channel
 		self.password = password
 		self.outbot = outbot
@@ -247,12 +249,12 @@ class ScpRankLurker(irc.bot.SingleServerIRCBot):
 
 	def on_welcome(self, c, e):
 		if self.password != "none":
-			print datetime.datetime.now(), " Lurker: Authenticating"
+			print datetime.datetime.now(), " Sybil: Authenticating"
 			c.privmsg("NickServ", "IDENTIFY " + self.password)
 			time.sleep(0.5);
-		print datetime.datetime.now(), " Lurker: Joining channel"
+		print datetime.datetime.now(), " Sybil: Joining channel"
 		c.join(self.channel)
-		print datetime.datetime.now(), " Lurker: Connected."
+		print datetime.datetime.now(), " Sybil: Connected."
 
 	def on_privmsg(self, c, e):
 		pass
@@ -267,7 +269,7 @@ class ScpRankLurker(irc.bot.SingleServerIRCBot):
 			
 		if result != "":
 			c.privmsg(nick, nick + ": " + result);
-			print datetime.datetime.now(), " Lurker: Sent notice: ", nick, ": ", result
+			print datetime.datetime.now(), "Sybil: Sent notice: ", nick, ": ", result
 
 	def on_dccmsg(self, c, e):
 		pass
@@ -278,47 +280,16 @@ class ScpRankLurker(irc.bot.SingleServerIRCBot):
 
 def main():
 
-	if len(sys.argv) != 9 and len(sys.argv) != 5:
-		print("Usage: scpRank.py <server[:port]> <channel1> <nickname1> <password1> [<server2[:port2]> <channel2> <nickname2> <password2>]")
-		sys.exit(1)
+	config = ConfigParser.RawConfigParser({'port':'6667'})
+	config.read('connection.ini')
 
-	s = sys.argv[1].split(":", 1)
-	server1 = s[0]
-	if len(s) == 2:
-		try:
-			port1 = int(s[1])
-		except ValueError:
-			print("Error: Erroneous port.")
-			sys.exit(1)
-	else:
-		port1 = 6667
+	scpRank = ScpRank(**dict(config.items('ScpRank')))
 
-	channel1 = sys.argv[2]
-	nickname1 = sys.argv[3]
-	password1 = sys.argv[4]
-
-	scpRank = ScpRankBot(channel1, nickname1, server1, port1, password1)
-
-	if len(sys.argv) == 9:
-		s = sys.argv[5].split(":", 1)
-		server2 = s[0]
-		if len(s) == 2:
-			try:
-				port2 = int(s[1])
-			except ValueError:
-				print("Error: Erroneous port.")
-				sys.exit(1)
-		else:
-			port2 = 6667
-
-		channel2 = sys.argv[6]
-		nickname2 = sys.argv[7]
-		password2 = sys.argv[8]
-
-		lurker = ScpRankLurker(channel2, nickname2, server2, port2, password2, scpRank)
-		lt = threading.Thread(target=lurker.start)
-		lt.setDaemon(True)
-		lt.start() #use computation time from computing transform to space their joins.
+	if config.has_section('Sybil'):
+		sybil = Sybil(**dict(config.items('Sybil')))
+		st = threading.Thread(target=sybil.start)
+		st.setDaemon(True)
+		st.start()
 
 	refresh()
 	ut = threading.Timer(60*60, fullrefresh)
@@ -341,3 +312,4 @@ def main():
 		
 if (__name__ == "__main__")  and not(sys.flags.interactive):
 	main()
+
