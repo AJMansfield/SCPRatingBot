@@ -16,6 +16,7 @@ import irc.strings
 import time
 import datetime
 import sys
+import os
 import random
 
 import subprocess
@@ -23,8 +24,6 @@ import threading
 
 import ConfigParser
 
-
-np.seterr(all='warn')
 
 def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95%
     n = ups + downs
@@ -37,6 +36,9 @@ def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95
     	return ((phat + z*z/(2*n) - z * sqrt((phat*(1-phat)+z*z/(4*n))/n))/(1+z*z/n))
     else:
     	return ((phat + z*z/(2*n) + z * sqrt((phat*(1-phat)+z*z/(4*n))/n))/(1+z*z/n))
+
+
+np.seterr(all='warn')
 
 def fullrefresh():
 	try:
@@ -105,9 +107,6 @@ def refresh():
 		raise
 
 
-
-
-
 def recommend(uname):
 
 	uname = uname.lower()
@@ -133,8 +132,6 @@ def recommend(uname):
 		print datetime.datetime.now(), " ", e.__doc__
 		print datetime.datetime.now(), " ", e.message
 		return "An unknown error occured."
-
-
 
 
 def best(args):
@@ -279,6 +276,10 @@ class Sybil(irc.bot.SingleServerIRCBot):
 
 
 def main():
+	if not(os.path.isfile('./pids.tsv')) or not(os.path.isfile('./uids.tsv')) or not(os.path.isfile('./votes.tsv')):
+		print 'Setting up vote database for the first time.'
+		fullrefresh()
+
 
 	config = ConfigParser.RawConfigParser({'port':'6667'})
 	config.read('connection.ini')
@@ -286,7 +287,7 @@ def main():
 	scpRank = ScpRank(**dict(config.items('ScpRank')))
 
 	if config.has_section('Sybil'):
-		sybil = Sybil(**dict(config.items('Sybil')))
+		sybil = Sybil(outbot=scpRank, **dict(config.items('Sybil')))
 		st = threading.Thread(target=sybil.start)
 		st.setDaemon(True)
 		st.start()
