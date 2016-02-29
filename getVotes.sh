@@ -89,8 +89,15 @@ getPid(){
 	pname="$1";
 
 	# get author vote data (since author's can't upvote their own work)
-	pid="$(curl --silent "http://www.scp-wiki.net/$pname" \
-			| grep -oP '(?<=pageId = )[0-9]*' )"
+	page="$(curl --silent "http://www.scp-wiki.net/$pname")"
+
+	pid="$(echo $page \
+		| grep -oP '(?<=pageId = )[0-9]*' )"
+
+	ptitle="$(echo $page \
+		| hxselect -ci -s '\n' 'div#page-title' 2>/dev/null \
+		| sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+		| tr -d '\n' )"
 
 	if test $? -ne 0;
 	then
@@ -133,7 +140,7 @@ getPid(){
 
 	echo -e $aid'\t'$aname >> uids2.tsv;
 
-	echo -e $pname'\t'$pid'\t'$aid'\t'$date;
+	echo -e $pname'\t'$pid'\t'$ptitle'\t'$aid'\t'$date;
 
 	exit $?;
 }

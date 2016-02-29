@@ -83,7 +83,7 @@ def refresh():
 		votes.drop_duplicates(['pid','uid'], inplace=True)
 		votes.set_index(['uid', 'pid'], inplace=True)
 
-		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid','aid','date'], dtype={'pname':'string', 'pid':np.int32})
+		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid','ptitle','aid','date'], dtype={'pname':'string', 'ptitle':'string', 'pid':np.int32})
 		pids.fillna(0, inplace=True)
 		pids['aid'] = pids['aid'].astype(np.int32)
 		pids['date'] = pids['date'].astype(np.int32)
@@ -97,8 +97,8 @@ def refresh():
 
 		vtab = votes.unstack()['vote']
 		vcounts = vtab.apply(pd.Series.value_counts).fillna(0).transpose().reset_index().set_index('pid')
-		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b)) * 10
-		pids['hot'] = pids['best'] / (nextUpdateTime - pids['date']).apply(math.log) * 100
+		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b,2.0)) * 10
+		pids['hot'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b)) / (nextUpdateTime - pids['date']).apply(math.log) * 10
 		
 		print datetime.datetime.now(), " Computing transform"
 
@@ -122,7 +122,7 @@ def recommend(uname):
 
 	try:
 		try:
-			uid = uids[uids.name.apply(slugify) == slugify(uname)].index[0]
+			uid = uids[uids.uname.apply(slugify) == slugify(uname)].index[0]
 
 		except KeyError, SyntaxError:
 
@@ -151,7 +151,7 @@ def best(args):
 		else:
 			i = int(args)-1
 
-		if i <= 0:
+		if i < 0:
 			return "Out of range."
 
 		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
@@ -170,7 +170,7 @@ def hot(args):
 		else:
 			i = int(args)-1
 
-		if i <= 0:
+		if i < 0:
 			return "Out of range."
 
 		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
@@ -211,10 +211,8 @@ def command(cmd):
 			return best(cmd[6:].strip())
 		elif cmd[:6].strip() == ".rank":
 			return rank(cmd[5:].strip())
-		elif cmd[:6].strip() == ".hot":
+		elif cmd[:5].strip() == ".hot":
 			return hot(cmd[5:].strip())
-		elif cmd[:4] == ".new":
-			return "This feature has not yet been implemented."
 		elif cmd[:4] == ".src":
 			return "https://github.com/AJMansfield/SCPRatingBot"
 		else:
