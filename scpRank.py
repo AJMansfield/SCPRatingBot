@@ -73,11 +73,12 @@ def fullrefresh():
 		t.start()
 
 		raise;
-	
+
+
 def refresh():
 	try:
 		print datetime.datetime.now(), " Refreshing stored tables"
-		global votes, vtab, pids, uids, m;
+		global votes, vtab, pids, uids, m, override;
 
 		votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'vote':np.int8})
 		votes.dropna(inplace=True)
@@ -85,15 +86,29 @@ def refresh():
 		votes.drop_duplicates(['pid','uid'], inplace=True)
 		votes.set_index(['uid', 'pid'], inplace=True)
 
-		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid','ptitle','aid','date'], dtype={'pname':'string', 'ptitle':'string', 'pid':np.int32})
+		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid','ptitle','uid','date'], dtype={'pname':'string', 'ptitle':'string', 'pid':np.int32})
 		pids.fillna(0, inplace=True)
-		pids['aid'] = pids['aid'].astype(np.int32)
+		pids['uid'] = pids['uid'].astype(np.int32)
 		pids['date'] = pids['date'].astype(np.int32)
 		pids.set_index('pid', inplace=True)
 
 		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
 		uids.drop_duplicates(inplace=True)
 		uids.set_index('uid', inplace=True)
+
+		override = pd.read_csv('override.tsv', '\t', header=None, names=['pname','uids','uname'])
+		override['uids'] = override['uids'].apply(lambda s: map(int, s.split()))
+		override['uid'] = override.reset_index()['index'].apply(lambda x:int(-x-1))
+		override['uid'] = override['uid'].astype(np.int32)
+
+
+		uids = uids.append(override[['uid','uname']].set_index('uid'))
+
+		authors = pids.reset_index()[['pname','uid']].set_index('pname')
+		authors.update(override[['pname','uid']].set_index('pname'))
+		authors.reset_index(inplace=True)
+		authors.index = pids.index
+		pids[['pname','uid']] = authors
 
 		print datetime.datetime.now(), " Counting votes"
 
@@ -215,7 +230,7 @@ def rank(pref):
 	pidhot = pids.sort_values('hot',ascending=False).reset_index()
 	entryhot = pidhot[pidhot.pid == entry.pid.iloc[0]]
 
-	return (entry.ptitle.iloc[0] + ", by " + uids.loc[entry.aid.iloc[0]].uname + "." +
+	return (entry.ptitle.iloc[0] + ", by " + uids.loc[entry.uid.iloc[0]].uname + "." +
 		" #" + str(entry.index[0]+1) + " all time (score %.5f)," % entry.best.iloc[0] +
 		" #" + str(entryhot.index[0]+1) + " hottest (score %.5f)." % entry.hot.iloc[0] )
 
