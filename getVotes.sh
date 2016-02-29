@@ -61,7 +61,6 @@ getVotes(){
 	cat $response \
 	| hxselect -ci -s '\n' 'a' \
 	| grep -oP '(?<=alt=")[^"]*' \
-	| tr "[:upper:]" "[:lower:]" \
 	>> $uname;
 
 	#zip data together into output format
@@ -125,9 +124,14 @@ getPid(){
 	| hxselect -ci -s '\n' 'a' 2>/dev/null \
 	| grep -oP '(?<=userid=)[0-9]*' )"
 
+	aname="$(echo $response \
+	| hxselect -ci -s '\n' 'a' 2>/dev/null \
+	| grep -oP '(?<=alt=")[^"]*' )"
+
 	date="$(echo $response \
 	| grep -oP '(?<=odate time_)[0-9]*' )"
 
+	echo -e $aid'\t'$aname >> uids2.tsv;
 
 	echo -e $pname'\t'$pid'\t'$aid'\t'$date;
 
