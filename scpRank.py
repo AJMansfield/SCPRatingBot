@@ -97,8 +97,8 @@ def refresh():
 
 		vtab = votes.unstack()['vote']
 		vcounts = vtab.apply(pd.Series.value_counts).fillna(0).transpose().reset_index().set_index('pid')
-		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b))
-		pids['hot'] = pids['best'] / (nextUpdateTime - pids['date']).apply(math.log)
+		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b)) * 10
+		pids['hot'] = pids['best'] / (nextUpdateTime - pids['date']).apply(math.log) * 100
 		
 		print datetime.datetime.now(), " Computing transform"
 
@@ -149,7 +149,10 @@ def best(args):
 		if args == "":
 			i = 0
 		else:
-			i = int(args)
+			i = int(args)-1
+
+		if i <= 0:
+			return "Out of range."
 
 		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
 			("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
@@ -165,7 +168,10 @@ def hot(args):
 		if args == "":
 			i = 0
 		else:
-			i = int(args)
+			i = int(args)-1
+
+		if i <= 0:
+			return "Out of range."
 
 		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
 			("http://scp-wiki.net/" + pids.sort_values('hot',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
@@ -177,17 +183,19 @@ def hot(args):
 		return "An unknown error occured."
 
 def rank(pname):
-#	try:
+	try:
 
-	pidscore = pids.sort_values('best',ascending=False).reset_index()
-	entry = pidscore[pidscore.pname == slugify(pname)]
+		pidscore = pids.sort_values('best',ascending=False).reset_index()
+		entry = pidscore[pidscore.pname == slugify(pname)]
+		pidhot = pids.sort_values('hot',ascending=False).reset_index()
+		entryhot = pidhot[pidhot.pname == slugify(pname)]
 
-	return ("By " + uids.loc[entry.aid.iloc[0]].uname + 
-		"; All Time: #" + str(entry.index[0]) + ", score " + str(entry.best.iloc[0]) +
-		"; Hot: # " + str(entry.index[0]) + ", score " + str(entry.hot.iloc[0]) )
+		return ("Author: " + uids.loc[entry.aid.iloc[0]].uname + 
+			"; All Time: #" + str(entry.index[0]+1) + ", score %.5f" % entry.best.iloc[0] +
+			"; Hot: # " + str(entryhot.index[0]+1) + ", score %.5f" % entry.hot.iloc[0] )
 
-#	except Exception as e:
-#		return ''
+	except Exception as e:
+		return ''
 
 
 
@@ -340,6 +348,6 @@ def main():
 
 		sys.exit(0)
 		
-#if (__name__ == "__main__")  and not(sys.flags.interactive):
-	#main()
+if (__name__ == "__main__")  and not(sys.flags.interactive):
+	main()
 
