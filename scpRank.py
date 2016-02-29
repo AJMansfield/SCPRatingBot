@@ -8,7 +8,7 @@ import numpy as np
 
 from slugify import slugify
 
-from math import sqrt
+from math import *
 
 import irc.bot
 import irc.strings
@@ -40,7 +40,10 @@ def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95
 
 np.seterr(all='warn')
 
+nextUpdateTime = time.time() + 6*60*60
+
 def fullrefresh():
+	global nextUpdateTime
 	try:
 		print datetime.datetime.now(), " Refreshing cache"
 		subprocess.call('./getVotes.sh')
@@ -50,6 +53,8 @@ def fullrefresh():
 		t.setDaemon(True)
 		t.start()
 		print datetime.datetime.now(), " Refreshed."
+
+		nextUpdateTime = time.time() + 6*60*60
 
 	except Exception:
 		print datetime.datetime.now(), " An error occured while refreshing the cache."
@@ -89,18 +94,18 @@ def refresh():
 
 		vtab = votes.unstack()['vote']
 		vcounts = vtab.apply(pd.Series.value_counts).fillna(0).transpose().reset_index().set_index('pid')
-		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b,1.96,True))
+		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b))
+		pids['hot'] = pids['best'] / (nextUpdateTime - pids['date']).apply(log)
 		
 		print datetime.datetime.now(), " Computing transform"
 
 		vtab = vtab.fillna(0).astype(np.float16)
-
 		svtab = sps.csr_matrix(vtab)
 
 		svtab = svtab / np.linalg.norm(vtab.as_matrix(), axis=0, keepdims=True)
 
 		m = svtab.transpose().dot(svtab)
-		
+
 		del svtab
 
 		print datetime.datetime.now(), " Done."
@@ -153,6 +158,22 @@ def best(args):
 		print datetime.datetime.now(), " ", e.message
 		return "An unknown error occured."
 
+def hot(args):
+	try:
+		if args == "":
+			i = 0
+		else:
+			i = int(args)
+
+		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
+			("http://scp-wiki.net/" + pids.sort_values('hot',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
+
+	except Exception as e:
+		print datetime.datetime.now(), " ", args
+		print datetime.datetime.now(), " ", e.__doc__
+		print datetime.datetime.now(), " ", e.message
+		return "An unknown error occured."
+
 
 def rank(args):
 	try:
@@ -178,7 +199,9 @@ def command(cmd):
 		elif cmd[:6].strip() == ".best":
 			return best(cmd[6:].strip())
 		elif cmd[:6].strip() == ".rank":
-			return rank(cmd[6:].strip())
+			return rank(cmd[5:].strip())
+		elif cmd[:6].strip() == ".hot":
+			return hot(cmd[5:].strip())
 		elif cmd[:4] == ".new":
 			return "This feature has not yet been implemented."
 		elif cmd[:4] == ".src":
