@@ -6,9 +6,9 @@ source ./getAuth.sh
 # gets records of all user votes on a page
 getVotes(){
 
-	pid=$2;
-	pname=$1;
-	aid=$3
+	pname=$1
+	pid=$2
+	aid=$4
 
 	response=$(mktemp);
 
