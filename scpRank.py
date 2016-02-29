@@ -69,15 +69,14 @@ def fullrefresh():
 def refresh():
 	try:
 		print datetime.datetime.now(), " Refreshing stored tables"
-		global votes, vtab, pids, pidscore, uids, m;
+		global votes, vtab, pids, uids, m;
 
 		votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'uid':np.int32, 'vote':np.int8})
 		votes.drop_duplicates(['pid','uid'], inplace=True)
 		votes.set_index(['uid', 'pid'], inplace=True)
 
-		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid','aid','date'], dtype={'pname':'string'})
+		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid','aid','date'], dtype={'pname':'string', 'pid':np.int32})
 		pids.fillna(0, inplace=True)
-		pids['pid'] = pids['pid'].astype(np.int32)
 		pids['aid'] = pids['aid'].astype(np.int32)
 		pids['date'] = pids['date'].astype(np.int32)
 		pids.set_index('pid', inplace=True)
