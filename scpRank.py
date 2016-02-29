@@ -6,9 +6,9 @@ import scipy.sparse as sps
 import scipy.sparse.linalg as sls
 import numpy as np
 
-from slugify import slugify
+import slugify as sluggy
 
-from math import *
+import math
 
 import irc.bot
 import irc.strings
@@ -24,6 +24,9 @@ import threading
 
 import ConfigParser
 
+def slugify(arg):
+	return sluggy.slugify(unicode(arg));
+
 
 def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95%
     n = ups + downs
@@ -33,9 +36,9 @@ def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95
 
     phat = float(ups) / n
     if lb:
-    	return ((phat + z*z/(2*n) - z * sqrt((phat*(1-phat)+z*z/(4*n))/n))/(1+z*z/n))
+    	return ((phat + z*z/(2*n) - z * math.sqrt((phat*(1-phat)+z*z/(4*n))/n))/(1+z*z/n))
     else:
-    	return ((phat + z*z/(2*n) + z * sqrt((phat*(1-phat)+z*z/(4*n))/n))/(1+z*z/n))
+    	return ((phat + z*z/(2*n) + z * math.sqrt((phat*(1-phat)+z*z/(4*n))/n))/(1+z*z/n))
 
 
 np.seterr(all='warn')
@@ -88,14 +91,14 @@ def refresh():
 
 		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
 		uids.drop_duplicates(inplace=True)
-		uids.set_index('uname', inplace=True)
+		uids.set_index('uid', inplace=True)
 
 		print datetime.datetime.now(), " Counting votes"
 
 		vtab = votes.unstack()['vote']
 		vcounts = vtab.apply(pd.Series.value_counts).fillna(0).transpose().reset_index().set_index('pid')
 		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b))
-		pids['hot'] = pids['best'] / (nextUpdateTime - pids['date']).apply(log)
+		pids['hot'] = pids['best'] / (nextUpdateTime - pids['date']).apply(math.log)
 		
 		print datetime.datetime.now(), " Computing transform"
 
@@ -117,10 +120,9 @@ def refresh():
 
 def recommend(uname):
 
-	uname = uname.lower()
 	try:
 		try:
-			uid = uids.loc[uname,'uid']
+			uid = uids[uids.name.apply(slugify) == slugify(uname)].index[0]
 
 		except KeyError, SyntaxError:
 
@@ -174,17 +176,18 @@ def hot(args):
 		print datetime.datetime.now(), " ", e.message
 		return "An unknown error occured."
 
+def rank(pname):
+#	try:
 
-def rank(args):
-	try:
+	pidscore = pids.sort_values('best',ascending=False).reset_index()
+	entry = pidscore[pidscore.pname == slugify(pname)]
 
-		pidscore = pids.sort_values('best',ascending=False).reset_index()
-		entry = pidscore[pidscore.pname == slugify(args)]
+	return ("By " + uids.loc[entry.aid.iloc[0]].uname + 
+		"; All Time: #" + str(entry.index[0]) + ", score " + str(entry.best.iloc[0]) +
+		"; Hot: # " + str(entry.index[0]) + ", score " + str(entry.hot.iloc[0]) )
 
-		return ("Ranking: #" + str(entry.index.tolist()[0]) + ", Score: " + str(entry.best.iloc[0]))
-
-	except Exception as e:
-		return ''
+#	except Exception as e:
+#		return ''
 
 
 
@@ -337,6 +340,6 @@ def main():
 
 		sys.exit(0)
 		
-if (__name__ == "__main__")  and not(sys.flags.interactive):
-	main()
+#if (__name__ == "__main__")  and not(sys.flags.interactive):
+	#main()
 
