@@ -25,7 +25,7 @@ import threading
 import ConfigParser
 
 def slugify(arg):
-	return sluggy.slugify(unicode(arg));
+	return sluggy.slugify(unicode(str(arg).decode('utf-8')));
 
 
 def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95%
@@ -79,7 +79,9 @@ def refresh():
 		print datetime.datetime.now(), " Refreshing stored tables"
 		global votes, vtab, pids, uids, m;
 
-		votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'uid':np.int32, 'vote':np.int8})
+		votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'vote':np.int8})
+		votes.dropna(inplace=True)
+		votes['uid'] = votes['uid'].astype(np.int32)
 		votes.drop_duplicates(['pid','uid'], inplace=True)
 		votes.set_index(['uid', 'pid'], inplace=True)
 
@@ -97,9 +99,13 @@ def refresh():
 
 		vtab = votes.unstack()['vote']
 		vcounts = vtab.apply(pd.Series.value_counts).fillna(0).transpose().reset_index().set_index('pid')
+		pids['up'] = vcounts[1]
+		pids['dn'] = vcounts[-1]
 		pids['best'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b,2.0)) * 10
-		pids['hot'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b)) / (nextUpdateTime - pids['date']).apply(math.log) * 10
-		
+		pids['hot'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(a,b,1.0))
+		pids['hot'] = pids['hot'] / (nextUpdateTime - pids['date']).apply(math.log) * 10
+		pids['worst'] = vcounts[1].combine(vcounts[-1], lambda a,b: confidence(b,a,2.0)) * 10
+
 		print datetime.datetime.now(), " Computing transform"
 
 		vtab = vtab.fillna(0).astype(np.float16)
@@ -154,7 +160,7 @@ def best(args):
 		if i < 0:
 			return "Out of range."
 
-		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
+		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + "th best: " +
 			("http://scp-wiki.net/" + pids.sort_values('best',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
 
 	except Exception as e:
@@ -173,7 +179,7 @@ def hot(args):
 		if i < 0:
 			return "Out of range."
 
-		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + ": " +
+		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + "th hottest: " +
 			("http://scp-wiki.net/" + pids.sort_values('hot',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
 
 	except Exception as e:
@@ -182,20 +188,39 @@ def hot(args):
 		print datetime.datetime.now(), " ", e.message
 		return "An unknown error occured."
 
-def rank(pname):
+def worst(args):
 	try:
+		if args == "":
+			i = 0
+		else:
+			i = int(args)-1
 
-		pidscore = pids.sort_values('best',ascending=False).reset_index()
-		entry = pidscore[pidscore.pname == slugify(pname)]
-		pidhot = pids.sort_values('hot',ascending=False).reset_index()
-		entryhot = pidhot[pidhot.pname == slugify(pname)]
+		if i < 0:
+			return "Out of range."
 
-		return ("Author: " + uids.loc[entry.aid.iloc[0]].uname + 
-			"; All Time: #" + str(entry.index[0]+1) + ", score %.5f" % entry.best.iloc[0] +
-			"; Hot: # " + str(entryhot.index[0]+1) + ", score %.5f" % entry.hot.iloc[0] )
+		return ("Showing " + str(5*i+1) + "-" + str(5*i+5) + "th worst: " +
+			("http://scp-wiki.net/" + pids.sort_values('worst',ascending=False).iloc[5*i:5*i+5]['pname']).str.cat(sep=", "))
 
 	except Exception as e:
-		return ''
+		print datetime.datetime.now(), " ", args
+		print datetime.datetime.now(), " ", e.__doc__
+		print datetime.datetime.now(), " ", e.message
+		return "An unknown error occured."
+
+def rank(pref):
+	# try:
+
+	pidscore = pids.sort_values('best',ascending=False).reset_index()
+	entry = pidscore[(pidscore.pname.apply(slugify) == slugify(pref)) | (pidscore.ptitle.apply(slugify) == slugify(pref))]
+	pidhot = pids.sort_values('hot',ascending=False).reset_index()
+	entryhot = pidhot[pidhot.pid == entry.pid.iloc[0]]
+
+	return (entry.ptitle.iloc[0] + ", by " + uids.loc[entry.aid.iloc[0]].uname + "." +
+		" #" + str(entry.index[0]+1) + " all time (score %.5f)," % entry.best.iloc[0] +
+		" #" + str(entryhot.index[0]+1) + " hottest (score %.5f)." % entry.hot.iloc[0] )
+
+	# except Exception as e:
+	# 	return ''
 
 
 
@@ -210,9 +235,11 @@ def command(cmd):
 		elif cmd[:6].strip() == ".best":
 			return best(cmd[6:].strip())
 		elif cmd[:6].strip() == ".rank":
-			return rank(cmd[5:].strip())
+			return rank(cmd[6:].strip())
 		elif cmd[:5].strip() == ".hot":
 			return hot(cmd[5:].strip())
+		elif cmd[:7].strip() == ".worst":
+			return worst(cmd[7:].strip())
 		elif cmd[:4] == ".src":
 			return "https://github.com/AJMansfield/SCPRatingBot"
 		else:
