@@ -146,6 +146,14 @@ getPid(){
 }
 export -f getPid;
 
+getOverrides() {
+	curl --silent 'http://scprank.wikidot.com/author-override' \
+	| hxselect -ci -s '\t\n' 'table.wiki-content-table tr td' \
+	| perl -pe 's|<span class="printuser avatarhover">.*?userid=([[:digit:]]+).*?<\/span>|\1|g' \
+	| xargs -L 3 -d '\n' echo \
+	| sed "s/[[:blank:]]*$//"
+}
+
 
 
 # check robots.txt to make sure we are allowed in
@@ -189,6 +197,8 @@ comm -13 pages.tsv $newpages \
 mv $newpages pages.tsv;
 
 sort -u pids.tsv -o pids.tsv;
+
+getOverrides > override.tsv
 
 echo "Generating vote database";
 votes=$(mktemp);
