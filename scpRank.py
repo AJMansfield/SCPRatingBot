@@ -304,10 +304,10 @@ def main():
 		scpRank.disconnect("scpRank should be back soon!")
 
 		wait = random.randint(0, 30)
-		print datetime.datetime.now(), " Waiting ", wait, " seconds before disconnecting lurker."
+		print datetime.datetime.now(), " Waiting ", wait, " seconds before disconnecting sybil."
 		time.sleep(wait)
 
-		lurker.disconnect("disconnect message")
+		sybil.disconnect("disconnect message")
 
 		sys.exit(0)
 		
