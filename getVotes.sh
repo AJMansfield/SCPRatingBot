@@ -123,9 +123,51 @@ getPages(){
 
 #retrieves the pid number for a given page name
 getPid(){
-	echo -ne $1'\t';
-	curl --silent "http://www.scp-wiki.net/$1" \
-	| grep -oP '(?<=pageId = )[0-9]*' ;
+	pname="$1";
+
+	# get author vote data (since author's can't upvote their own work)
+	pid="$(curl --silent "http://www.scp-wiki.net/$pname" \
+			| grep -oP '(?<=pageId = )[0-9]*' )"
+
+	if test $? -ne 0;
+	then
+		echo "$pname getPid" >> errors.log;
+		exit 1;
+	fi
+
+	response="$(curl 'http://www.scp-wiki.net/ajax-module-connector.php' \
+	  -H "Cookie: wikidot_udsession=1; $cookie; $token;" \
+	  -H 'Origin: http://www.scp-wiki.net' \
+	  -H "Referer: http://www.scp-wiki.net/$pname" \
+	  -H 'Accept-Encoding: gzip, deflate' \
+	  -H 'Accept-Language: en-US,en;q=0.8' \
+	  -H 'User-Agent: scpRank' \
+	  -H 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8' \
+	  -H 'Accept: */*' \
+	  -H 'X-Requested-With: XMLHttpRequest' \
+	  -H 'Connection: keep-alive' \
+	  --data "page=1&perpage=20&page_id=$pid&options=%7B%22new%22%3Atrue%7D&moduleName=history%2FPageRevisionListModule&callbackIndex=3&$token" \
+	  --compressed \
+	  --silent \
+	| python2.7 -c "import json,sys;obj=json.load(sys.stdin);print obj['body'];" 2>/dev/null )"
+
+	if test $? -ne 0;
+	then
+		rm $response $vote $uid $uname;
+		echo "$pname $pid getAid" >> errors.log;
+		exit 1;
+	fi
+
+	aid="$(echo $response \
+	| hxselect -ci -s '\n' 'a' 2>/dev/null \
+	| grep -oP '(?<=userid=)[0-9]*' )"
+
+	date="$(echo $response \
+	| grep -oP '(?<=odate time_)[0-9]*' )"
+
+
+	echo -ne $pname'\t'$pid'\t'$aid'\t'$date;
+
 	exit $?;
 }
 export -f getPid;
