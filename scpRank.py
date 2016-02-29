@@ -75,7 +75,11 @@ def refresh():
 		votes.drop_duplicates(['pid','uid'], inplace=True)
 		votes.set_index(['uid', 'pid'], inplace=True)
 
-		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid'], dtype={'pid':np.int32, 'pname':'string'})
+		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid','aid','date'], dtype={'pname':'string'})
+		pids.fillna(0, inplace=True)
+		pids['pid'] = pids['pid'].astype(np.int32)
+		pids['aid'] = pids['aid'].astype(np.int32)
+		pids['date'] = pids['date'].astype(np.int32)
 		pids.set_index('pid', inplace=True)
 
 		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})

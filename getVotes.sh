@@ -8,6 +8,7 @@ getVotes(){
 
 	pid=$2;
 	pname=$1;
+	aid=$3
 
 	response=$(mktemp);
 
@@ -15,46 +16,9 @@ getVotes(){
 	uid=$(mktemp);
 	uname=$(mktemp);
 
-	# get author vote data (since author's can't upvote their own work)
-
-	curl 'http://www.scp-wiki.net/ajax-module-connector.php' \
-	  -H "Cookie: wikidot_udsession=1; $cookie; $token;" \
-	  -H 'Origin: http://www.scp-wiki.net' \
-	  -H "Referer: http://www.scp-wiki.net/$pname" \
-	  -H 'Accept-Encoding: gzip, deflate' \
-	  -H 'Accept-Language: en-US,en;q=0.8' \
-	  -H 'User-Agent: scpRank' \
-	  -H 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8' \
-	  -H 'Accept: */*' \
-	  -H 'X-Requested-With: XMLHttpRequest' \
-	  -H 'Connection: keep-alive' \
-	  --data "page=1&perpage=20&page_id=$pid&options=%7B%22new%22%3Atrue%7D&moduleName=history%2FPageRevisionListModule&callbackIndex=3&$token" \
-	  --compressed \
-	  --silent \
-	| python2.7 -c "import json,sys;obj=json.load(sys.stdin);print obj['body'];" 2>/dev/null \
-	> $response;
-
-	if test $? -ne 0;
-	then
-		rm $response $vote $uid $uname;
-		echo "$pname author" >> errors.log;
-		exit 1;
-	fi
-
-	#extract user data from response
-	echo '+1' \
+	# Add author vote, since author's can't upvote their own stuff
+	echo -e $pid'\t'$aid'\t+1' \
 	> $vote;
-
-	cat $response \
-	| hxselect -ci -s '\n' 'a' 2>/dev/null \
-	| grep -oP '(?<=userid=)[0-9]*' \
-	> $uid;
-
-	cat $response \
-	| hxselect -ci -s '\n' 'a' 2>/dev/null \
-	| grep -oP '(?<=alt=")[^"]*' \
-	| tr "[:upper:]" "[:lower:]" \
-	> $uname;
 
 	#requet user vote data
 	curl 'http://www.scp-wiki.net/ajax-module-connector.php' \
@@ -153,7 +117,6 @@ getPid(){
 
 	if test $? -ne 0;
 	then
-		rm $response $vote $uid $uname;
 		echo "$pname $pid getAid" >> errors.log;
 		exit 1;
 	fi
@@ -166,7 +129,7 @@ getPid(){
 	| grep -oP '(?<=odate time_)[0-9]*' )"
 
 
-	echo -ne $pname'\t'$pid'\t'$aid'\t'$date;
+	echo -e $pname'\t'$pid'\t'$aid'\t'$date;
 
 	exit $?;
 }
@@ -210,8 +173,7 @@ echo "" > uids2.tsv; #clear user ID list
 # filter out names of pages that are already known, and download all new pages
 touch pages.tsv;
 comm -13 pages.tsv $newpages \
-| parallel -j4 --retries 3 --bar getPid \
-| awk -F'\t+' 'NF == 2' \
+| parallel -j64 --retries 3 --bar getPid \
 >> pids.tsv;
 mv $newpages pages.tsv;
 
@@ -220,7 +182,7 @@ sort -u pids.tsv -o pids.tsv;
 echo "Generating vote database";
 votes=$(mktemp);
 cat pids.tsv \
-| parallel -j4 --retries 3 --colsep '\t' --bar getVotes \
+| parallel -j64 --retries 3 --colsep '\t' --bar getVotes \
 > $votes;
 
 if [ ! $? ];
@@ -229,5 +191,5 @@ then
 	rm $votes uids2.tsv;
 fi
 #only update main files once everything is done
-mv uids2.tsv uids.tsv;
+awk -F'\t+' 'NF == 2' < uids2.tsv > uids.tsv;
 mv $votes votes.tsv;
