@@ -98,10 +98,9 @@ def refresh():
 
 		override = pd.read_csv('override.tsv', '\t', header=None, names=['pname','uids','uname'])
 		override['uids'] = override['uids'].apply(lambda s: map(int, s.split()))
-		override['uid'] = override.reset_index()['index'].apply(lambda x:int(-x-1))
+		override['uid'] = override.reset_index()['index'].apply(lambda x:-x-1)
 		override['uid'] = override['uid'].astype(np.int32)
-
-
+		
 		uids = uids.append(override[['uid','uname']].set_index('uid'))
 
 		authors = pids.reset_index()[['pname','uid']].set_index('pname')
@@ -109,6 +108,8 @@ def refresh():
 		authors.reset_index(inplace=True)
 		authors.index = pids.index
 		pids[['pname','uid']] = authors
+
+		pids['uid'] = pids['uid'].astype(np.int32)
 
 		print datetime.datetime.now(), " Counting votes"
 

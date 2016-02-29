@@ -147,11 +147,11 @@ getPid(){
 export -f getPid;
 
 getOverrides() {
-	curl --silent 'http://scprank.wikidot.com/author-override' \
-	| hxselect -ci -s '\t\n' 'table.wiki-content-table tr td' \
-	| perl -pe 's|<span class="printuser avatarhover">.*?userid=([[:digit:]]+).*?<\/span>|\1|g' \
-	| xargs -L 3 -d '\n' echo \
-	| sed "s/[[:blank:]]*$//"
+curl --silent 'http://scprank.wikidot.com/author-override' \
+| hxselect -ci -s '\t\n' 'table.wiki-content-table tr td' \
+| perl -pe 's|<span class="printuser avatarhover">.*?userid=([[:digit:]]+).*?<\/span>|\1|g' \
+| xargs -L 3 -d '\n' echo \
+| sed "s/[[:blank:]]*$//"
 }
 
 
