@@ -391,11 +391,12 @@ def main():
 
 		scpRank.disconnect("scpRank should be back soon!")
 
-		wait = random.randint(0, 30)
-		print datetime.datetime.now(), " Waiting ", wait, " seconds before disconnecting sybil."
-		time.sleep(wait)
+		if config.has_section('Sybil'):
+			wait = random.randint(0, 30)
+			print datetime.datetime.now(), " Waiting ", wait, " seconds before disconnecting sybil."
+			time.sleep(wait)
 
-		sybil.disconnect("disconnect message")
+			sybil.disconnect()
 
 		sys.exit(0)
 		
