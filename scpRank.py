@@ -394,7 +394,8 @@ def main():
 		st.setDaemon(True)
 		st.start()
 
-	#reload()
+	reload()
+	
 	ut = threading.Timer(10*60, refresh)
 	ut.setDaemon(True)
 	ut.start()
