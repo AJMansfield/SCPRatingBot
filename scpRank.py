@@ -76,7 +76,7 @@ def refresh():
 			pass
 
 		print datetime.datetime.now(), " Scheduling next refresh"
-		t = threading.Timer(60*60, fullrefresh)
+		t = threading.Timer(60*60, refresh)
 		t.setDaemon(True)
 		t.start()
 
@@ -366,7 +366,7 @@ class Sybil(irc.bot.SingleServerIRCBot):
 def main():
 	if not(os.path.isfile('./pids.tsv')) or not(os.path.isfile('./uids.tsv')) or not(os.path.isfile('./votes.tsv')):
 		print 'Setting up vote database for the first time.'
-		fullrefresh()
+		refresh()
 
 
 	config = ConfigParser.RawConfigParser({'port':'6667'})
@@ -381,7 +381,7 @@ def main():
 		st.start()
 
 	reload()
-	ut = threading.Timer(60*60, fullrefresh)
+	ut = threading.Timer(10*60, refresh)
 	ut.setDaemon(True)
 	ut.start()
 
