@@ -192,7 +192,7 @@ echo "" > uids2.tsv; #clear user ID list
 # filter out names of pages that are already known, and download all new pages
 touch pages.tsv;
 comm -13 pages.tsv $newpages \
-| parallel -j64 --retries 3 --bar getPid \
+| parallel -j4 --retries 3 --bar getPid \
 >> pids.tsv;
 mv $newpages pages.tsv;
 
@@ -203,7 +203,7 @@ getOverrides > override.tsv
 echo "Generating vote database";
 votes=$(mktemp);
 cat pids.tsv \
-| parallel -j64 --retries 3 --colsep '\t' --bar getVotes \
+| parallel -j4 --retries 3 --colsep '\t' --bar getVotes \
 > $votes;
 
 if [ ! $? ];
