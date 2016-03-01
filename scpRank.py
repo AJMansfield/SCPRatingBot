@@ -43,21 +43,29 @@ def confidence(ups, downs, z = 1.0, lb=True): #z = 1.44 for 85%, z = 1.96 for 95
 
 np.seterr(all='warn')
 
-nextUpdateTime = time.time() + 6*60*60
+nextUpdateTime = time.time() + 60*60
+updateCount = 0
 
-def fullrefresh():
-	global nextUpdateTime
+def refresh():
+	global nextUpdateTime, updateCount
 	try:
+		updateCount += 1
+		if updateCount % 6 == 0:
+			os.remove('pages.tsv')
+			os.remove('pids.tsv')
+
 		print datetime.datetime.now(), " Refreshing cache"
+
 		subprocess.call('./getVotes.sh')
-		refresh()
+		reload()
+
 		print datetime.datetime.now(), " Scheduling next refresh"
-		t = threading.Timer(6*60*60, fullrefresh)
+		t = threading.Timer(60*60, refresh)
 		t.setDaemon(True)
 		t.start()
 		print datetime.datetime.now(), " Refreshed."
 
-		nextUpdateTime = time.time() + 6*60*60
+		nextUpdateTime = time.time() + 60*60
 
 	except Exception:
 		print datetime.datetime.now(), " An error occured while refreshing the cache."
@@ -68,16 +76,16 @@ def fullrefresh():
 			pass
 
 		print datetime.datetime.now(), " Scheduling next refresh"
-		t = threading.Timer(6*60*60, fullrefresh)
+		t = threading.Timer(60*60, fullrefresh)
 		t.setDaemon(True)
 		t.start()
 
 		raise;
 
 
-def refresh():
+def reload():
 	try:
-		print datetime.datetime.now(), " Refreshing stored tables"
+		print datetime.datetime.now(), " Reloading stored tables"
 		global votes, vtab, pids, uids, m, override;
 
 		votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'vote':np.int8})
@@ -372,7 +380,7 @@ def main():
 		st.setDaemon(True)
 		st.start()
 
-	refresh()
+	reload()
 	ut = threading.Timer(60*60, fullrefresh)
 	ut.setDaemon(True)
 	ut.start()
