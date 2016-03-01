@@ -92,8 +92,10 @@ def refresh():
 		pids['date'] = pids['date'].astype(np.int32)
 		pids.set_index('pid', inplace=True)
 
-		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uid':np.int32, 'uname':'string'})
+		uids = pd.read_csv('uids.tsv', '\t', header=None, names=['uid','uname'], dtype={'uname':'string'})
 		uids.drop_duplicates(inplace=True)
+		uids.dropna(inplace=True);
+		uids['uid'] = uids['uid'].astype(np.int32);
 		uids.set_index('uid', inplace=True)
 
 		override = pd.read_csv('override.tsv', '\t', header=None, names=['pname','uids','uname'])
