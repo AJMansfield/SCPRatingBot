@@ -16,6 +16,7 @@ import irc.strings
 import time
 import datetime
 import sys
+import signal
 import os
 import random
 
@@ -23,6 +24,10 @@ import subprocess
 import threading
 
 import ConfigParser
+
+
+
+
 
 def slugify(arg):
 	return sluggy.slugify(unicode(str(arg).decode('utf-8')));
@@ -278,6 +283,7 @@ def command(cmd):
 		return "An unknown error occured."
 
 
+mess = []
 
 
 class ScpRank(irc.bot.SingleServerIRCBot):
@@ -287,9 +293,13 @@ class ScpRank(irc.bot.SingleServerIRCBot):
 		self.password = password
 
 	def on_nicknameinuse(self, c, e):
+		global mess
+		mess.append(e)
 		c.nick(c.get_nickname() + "_")
 
 	def on_welcome(self, c, e):
+		global mess
+		mess.append(e)
 		if self.password != "none":
 			print datetime.datetime.now(), " Authenticating"
 			c.privmsg("NickServ", "IDENTIFY " + self.password)
@@ -299,6 +309,8 @@ class ScpRank(irc.bot.SingleServerIRCBot):
 		print datetime.datetime.now(), " Connected."
 
 	def on_privmsg(self, c, e):
+		global mess
+		mess.append(e)
 		nick = e.source.nick
 		c = self.connection
 
@@ -308,6 +320,8 @@ class ScpRank(irc.bot.SingleServerIRCBot):
 			print datetime.datetime.now(), " Sent PM: ", nick, ": ", result
 
 	def on_pubmsg(self, c, e):
+		global mess
+		mess.append(e)
 		nick = e.source.nick
 		c = self.connection
 
@@ -380,15 +394,16 @@ def main():
 		st.setDaemon(True)
 		st.start()
 
-	reload()
+	#reload()
 	ut = threading.Timer(10*60, refresh)
 	ut.setDaemon(True)
 	ut.start()
 
-	try:
-		scpRank.start()
-	except:
+	rt = threading.Thread(target=scpRank.start)
+	rt.setDaemon(True)
+	rt.start()
 
+	def signal_handler(signal, frame):
 		scpRank.disconnect("scpRank should be back soon!")
 
 		if config.has_section('Sybil'):
@@ -399,7 +414,10 @@ def main():
 			sybil.disconnect()
 
 		sys.exit(0)
-		
+
+	signal.signal(signal.SIGINT, signal_handler)
+	signal.pause()
+
 if (__name__ == "__main__")  and not(sys.flags.interactive):
 	main()
 
