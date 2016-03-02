@@ -101,7 +101,7 @@ def reload():
 		votes.set_index(['uid', 'pid'], inplace=True)
 
 		pids = pd.read_csv('pids.tsv', '\t', header=None, names=['pname','pid','ptitle','uid','date'], dtype={'pname':'string', 'ptitle':'string', 'pid':np.int32})
-		pids.fillna(0, inplace=True)
+		pids.dropna(inplace=True)
 		pids['uid'] = pids['uid'].astype(np.int32)
 		pids['date'] = pids['date'].astype(np.int32)
 		pids.set_index('pid', inplace=True)
@@ -113,18 +113,23 @@ def reload():
 		uids.set_index('uid', inplace=True)
 
 		override = pd.read_csv('override.tsv', '\t', header=None, names=['pname','uids','uname'])
+		override.dropna(inplace=True)
 		override['uids'] = override['uids'].apply(lambda s: map(int, s.split()))
 		override['uid'] = override.reset_index()['index'].apply(lambda x:-x-1)
 		override['uid'] = override['uid'].astype(np.int32)
 		names = override.pname
 		override.set_index('pname',inplace=True)
 		override['pid'] = pids.reset_index().set_index('pname').loc[names]['pid']
+		override.dropna(inplace=True)
+		override['pid'] = override['pid'].astype(np.int32)
 		override.reset_index(inplace=True)
 		del names
 		
 		uids = uids.append(override[['uid','uname']].set_index('uid'))
 
 		pids.update(override.set_index('pid'))
+		pids.dropna(inplace=True)
+		pids['uid'] = pids['uid'].astype(np.int32)
 
 		print datetime.datetime.now(), " Counting votes"
 
