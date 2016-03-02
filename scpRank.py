@@ -52,6 +52,7 @@ nextUpdateTime = time.time() + 60*60
 updateCount = 0
 
 def refresh():
+	global ut
 	global nextUpdateTime, updateCount
 	try:
 		updateCount += 1
@@ -65,9 +66,9 @@ def refresh():
 		reload()
 
 		print datetime.datetime.now(), " Scheduling next refresh"
-		t = threading.Timer(60*60, refresh)
-		t.setDaemon(True)
-		t.start()
+		ut = threading.Timer(60*60, refresh)
+		ut.setDaemon(True)
+		ut.start()
 		print datetime.datetime.now(), " Refreshed."
 
 		nextUpdateTime = time.time() + 60*60
@@ -76,14 +77,14 @@ def refresh():
 		print datetime.datetime.now(), " An error occured while refreshing the cache."
 
 		try:
-			t.cancel()
+			ut.cancel()
 		except Exception:
 			pass
 
 		print datetime.datetime.now(), " Scheduling next refresh"
-		t = threading.Timer(60*60, refresh)
-		t.setDaemon(True)
-		t.start()
+		ut = threading.Timer(60*60, refresh)
+		ut.setDaemon(True)
+		ut.start()
 
 		raise;
 
@@ -283,8 +284,6 @@ def command(cmd):
 		return "An unknown error occured."
 
 
-mess = []
-
 
 class ScpRank(irc.bot.SingleServerIRCBot):
 	def __init__(self, channel, nickname, server, port=6667, password=''):
@@ -293,13 +292,9 @@ class ScpRank(irc.bot.SingleServerIRCBot):
 		self.password = password
 
 	def on_nicknameinuse(self, c, e):
-		global mess
-		mess.append(e)
 		c.nick(c.get_nickname() + "_")
 
 	def on_welcome(self, c, e):
-		global mess
-		mess.append(e)
 		if self.password != "none":
 			print datetime.datetime.now(), " Authenticating"
 			c.privmsg("NickServ", "IDENTIFY " + self.password)
@@ -309,8 +304,6 @@ class ScpRank(irc.bot.SingleServerIRCBot):
 		print datetime.datetime.now(), " Connected."
 
 	def on_privmsg(self, c, e):
-		global mess
-		mess.append(e)
 		nick = e.source.nick
 		c = self.connection
 
@@ -320,8 +313,6 @@ class ScpRank(irc.bot.SingleServerIRCBot):
 			print datetime.datetime.now(), " Sent PM: ", nick, ": ", result
 
 	def on_pubmsg(self, c, e):
-		global mess
-		mess.append(e)
 		nick = e.source.nick
 		c = self.connection
 
@@ -378,6 +369,8 @@ class Sybil(irc.bot.SingleServerIRCBot):
 
 
 def main():
+	global ut
+
 	if not(os.path.isfile('./pids.tsv')) or not(os.path.isfile('./uids.tsv')) or not(os.path.isfile('./votes.tsv')):
 		print 'Setting up vote database for the first time.'
 		refresh()
