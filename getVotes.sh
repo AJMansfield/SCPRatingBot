@@ -66,10 +66,10 @@ getVotes(){
 	#zip data together into output format
 	paste $uid $vote \
 	| sed -e "s/^/$pid\t/" \
-	| awk -F'\t+' 'NF == 3';
+	| awk -F'\t' 'NF == 3';
 
 	paste $uid $uname \
-	| awk -F'\t+' 'NF == 2' \
+	| awk -F'\t' 'NF == 2' \
 	>> uids2.tsv;
 
 	#clean up temporary files
@@ -205,6 +205,7 @@ echo "Generating vote database";
 votes=$(mktemp);
 cat pids.tsv \
 | parallel -j4 --retries 3 --colsep '\t' --bar getVotes \
+| awk -F'\t' 'NF == 3' \
 > $votes;
 
 if [ ! $? ];
@@ -213,5 +214,5 @@ then
 	rm $votes uids2.tsv;
 fi
 #only update main files once everything is done
-awk -F'\t+' 'NF == 2' < uids2.tsv > uids.tsv;
+awk -F'\t' 'NF == 2' < uids2.tsv > uids.tsv;
 mv $votes votes.tsv;
