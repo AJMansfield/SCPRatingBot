@@ -116,16 +116,15 @@ def reload():
 		override['uids'] = override['uids'].apply(lambda s: map(int, s.split()))
 		override['uid'] = override.reset_index()['index'].apply(lambda x:-x-1)
 		override['uid'] = override['uid'].astype(np.int32)
+		names = override.pname
+		override.set_index('pname',inplace=True)
+		override['pid'] = pids.reset_index().set_index('pname').loc[names]['pid']
+		override.reset_index(inplace=True)
+		del names
 		
 		uids = uids.append(override[['uid','uname']].set_index('uid'))
 
-		authors = pids.reset_index()[['pname','uid']].set_index('pname')
-		authors.update(override[['pname','uid']].set_index('pname'))
-		authors.reset_index(inplace=True)
-		authors.index = pids.index
-		pids[['pname','uid']] = authors
-
-		pids['uid'] = pids['uid'].astype(np.int32)
+		pids.update(override.set_index('pid'))
 
 		print datetime.datetime.now(), " Counting votes"
 
