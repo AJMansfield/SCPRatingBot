@@ -97,7 +97,8 @@ getPid(){
 	ptitle="$(echo $page \
 		| hxselect -ci -s '\n' 'div#page-title' 2>/dev/null \
 		| sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
-		| tr -d '\n' )"
+		| tr -d '\n' \
+		| perl -MHTML::Entities -pe 'decode_entities($_);' )"
 
 	if test $? -ne 0;
 	then
