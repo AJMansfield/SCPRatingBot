@@ -4,3 +4,4 @@ getAuth.sh
 test.sh
 *.tsv
 *.log
+*.png

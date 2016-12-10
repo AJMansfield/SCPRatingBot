@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2.7
 
 import pandas as pd
 import scipy as sp
@@ -92,7 +92,7 @@ def refresh():
 def reload():
 	try:
 		print datetime.datetime.now(), " Reloading stored tables"
-		global votes, vtab, pids, uids, m, override;
+		global votes, vtab, pids, uids, m, mup;
 
 		votes = pd.read_csv('votes.tsv', '\t', header=None, names=['pid','uid','vote'], dtype={'pid':np.int32, 'vote':np.int8})
 		votes.dropna(inplace=True)
@@ -112,22 +112,6 @@ def reload():
 		uids['uid'] = uids['uid'].astype(np.int32);
 		uids.set_index('uid', inplace=True)
 
-		override = pd.read_csv('override.tsv', '\t', header=None, names=['pname','uids','uname'])
-		override.dropna(inplace=True)
-		override['uids'] = override['uids'].apply(lambda s: map(int, s.split()))
-		override['uid'] = override.reset_index()['index'].apply(lambda x:-x-1)
-		override['uid'] = override['uid'].astype(np.int32)
-		names = override.pname
-		override.set_index('pname',inplace=True)
-		override['pid'] = pids.reset_index().set_index('pname').loc[names]['pid']
-		override.dropna(inplace=True)
-		override['pid'] = override['pid'].astype(np.int32)
-		override.reset_index(inplace=True)
-		del names
-		
-		uids = uids.append(override[['uid','uname']].set_index('uid'))
-
-		pids.update(override.set_index('pid'))
 		pids.dropna(inplace=True)
 		pids['uid'] = pids['uid'].astype(np.int32)
 
@@ -145,13 +129,22 @@ def reload():
 		print datetime.datetime.now(), " Computing transform"
 
 		vtab = vtab.fillna(0).astype(np.float16)
+
 		svtab = sps.csr_matrix(vtab)
-
-		svtab = svtab / np.linalg.norm(vtab.as_matrix(), axis=0, keepdims=True)
-
+		norm = np.linalg.norm(vtab.as_matrix(), axis=0, keepdims=True)
+		norm[norm==0]=1
+		svtab = svtab / norm
 		m = svtab.transpose().dot(svtab)
 
-		del svtab
+
+		vtabup = vtab.replace(-1.0, 0.0)
+		svtab2 = sps.csr_matrix(vtabup)
+		norm = np.linalg.norm(vtabup.as_matrix(), axis=0, keepdims=True)
+		norm[norm==0]=1
+		svtab2 = svtab2 / norm
+		mup = svtab.transpose().dot(svtab2)
+
+		del svtab, svtab2, norm
 
 		print datetime.datetime.now(), " Done."
 
@@ -184,6 +177,39 @@ def recommend(uname):
 		print datetime.datetime.now(), " ", e.__doc__
 		print datetime.datetime.now(), " ", e.message
 		return "An unknown error occured."
+
+
+def similar(pname):
+
+	try:
+		try:
+			pid = pids[pids.pname.apply(slugify) == slugify(pname)].index[0]
+		except KeyError, SyntaxError:
+			return "Page not recognised."
+
+
+		pvote = pd.DataFrame(columns=vtab.columns)
+		pvote.loc[0]=np.zeros(len(vtab.columns))
+		pvote.iloc[0][pid] = 1.0
+
+		pvote = pvote.transpose()
+		pvote['score'] = mup.dot(pvote)
+
+		data = pd.merge(pids, pvote, left_index=True, right_index=True)
+
+		data.loc[pid, "score"] = 0.0 #exclude this article from the rankings
+
+		data.sort_values(by='score', inplace=True, ascending=False)
+		data = data[data['score'] > 0]
+
+		return ("http://scp-wiki.net/" + data.head(5)['pname']).str.cat(sep=", ")
+
+	except Exception as e:
+		print datetime.datetime.now(), " ", pname
+		print datetime.datetime.now(), " ", e.__doc__
+		print datetime.datetime.now(), " ", e.message
+		return "An unknown error occured."
+
 
 
 def best(args):
@@ -245,7 +271,6 @@ def worst(args):
 
 def rank(pref):
 	# try:
-
 	pidscore = pids.sort_values('best',ascending=False).reset_index()
 	entry = pidscore[(pidscore.pname.apply(slugify) == slugify(pref)) | (pidscore.ptitle.apply(slugify) == slugify(pref))]
 	pidhot = pids.sort_values('hot',ascending=False).reset_index()
@@ -261,13 +286,14 @@ def rank(pref):
 
 
 
-
 def command(cmd):
 	try:
 		if cmd[:1] == ".":
 			print datetime.datetime.now(), " query:", cmd
 		if cmd[:5] == ".rec ":
 			return recommend(cmd[5:].strip())
+		if cmd[:5] == ".sim ":
+			return similar(cmd[5:].strip())
 		elif cmd[:6].strip() == ".best":
 			return best(cmd[6:].strip())
 		elif cmd[:6].strip() == ".rank":
@@ -276,8 +302,10 @@ def command(cmd):
 			return hot(cmd[5:].strip())
 		elif cmd[:7].strip() == ".worst":
 			return worst(cmd[7:].strip())
-		elif cmd[:4] == ".src":
+		elif cmd[:4].strip() == ".src":
 			return "https://github.com/AJMansfield/SCPRatingBot"
+		elif cmd[:9].strip() == ".scpRank":
+			return "Commands: rec, sim, best, rank, hot, worst, src, scpRank"
 		else:
 			return ""
 
@@ -323,7 +351,7 @@ class ScpRank(irc.bot.SingleServerIRCBot):
 		result = command(e.arguments[0])
 		if result != "":
 			c.privmsg(self.channel, nick + ": " + result);
-			print datetime.datetime.now(), " Sent Chat: ", self.channel, ": ", nick, ": ", result
+			print datetime.datetime.now(), " Sent Chat: ", self.channel, "/", nick, ": ", result
 
 	def on_dccmsg(self, c, e):
 		pass
